@@ -3,13 +3,11 @@ package au.com.fairfax.adonis.apws.macros
 import scala.language.experimental.macros
 
 import scala.reflect.macros.Context
-import org.scalajs.spickling._
 import scala.reflect.runtime.universe
+import au.com.fairfax.adonis.json.{SampleUnpickler, SamplePickler, SamplePicklerRegistry}
 
 object SampleMaterializersImpl1 {
-  val GenericPtn = """(.*)\[(.*)\]""".r
-
-  def materializePickler[T: c.WeakTypeTag](c: Context): c.Expr[Pickler[T]] = {
+  def materializePickler[T: c.WeakTypeTag](c: Context): c.Expr[SamplePickler[T]] = {
     import c.universe._
 
     val tpe = weakTypeOf[T]
@@ -18,7 +16,7 @@ object SampleMaterializersImpl1 {
     if (!sym.isCaseClass) {
       c.error(c.enclosingPosition,
         "Cannot materialize pickler for non-case class")
-      return c.Expr[Pickler[T]](q"null")
+      return c.Expr[SamplePickler[T]](q"null")
     }
 
     val accessors = (tpe.declarations collect {
@@ -40,19 +38,20 @@ object SampleMaterializersImpl1 {
     """
 
     val result = q"""
-      implicit object GenPickler extends org.scalajs.spickling.Pickler[$tpe] {
+      implicit object GenPickler extends au.com.fairfax.adonis.json.SamplePickler[$tpe] {
         import org.scalajs.spickling._
+        import au.com.fairfax.adonis.json._
         override def pickle[P](value: $tpe)(
-            implicit registry: PicklerRegistry,
+            implicit registry: SamplePicklerRegistry,
             builder: PBuilder[P]): P = $pickleLogic
       }
       GenPickler
     """
 
-    c.Expr[Pickler[T]](result)
+    c.Expr[SamplePickler[T]](result)
   }
 
-  def materializeUnpickler[T: c.WeakTypeTag](c: Context): c.Expr[Unpickler[T]] = {
+  def materializeUnpickler[T: c.WeakTypeTag](c: Context): c.Expr[SampleUnpickler[T]] = {
     import c.universe._
 
     val tpe = weakTypeOf[T]
@@ -61,7 +60,7 @@ object SampleMaterializersImpl1 {
     if (!sym.isCaseClass) {
       c.error(c.enclosingPosition,
         "Cannot materialize pickler for non-case class")
-      return c.Expr[Unpickler[T]](q"null")
+      return c.Expr[SampleUnpickler[T]](q"null")
     }
 
     val accessors = (tpe.declarations collect {
@@ -89,10 +88,11 @@ object SampleMaterializersImpl1 {
     """
 
     val result = q"""
-      implicit object GenUnpickler extends org.scalajs.spickling.Unpickler[$tpe] {
+      implicit object GenUnpickler extends au.com.fairfax.adonis.json.SampleUnpickler[$tpe] {
         import org.scalajs.spickling._
+        import au.com.fairfax.adonis.json._
         override def unpickle[P](pickle: P)(
-            implicit registry: PicklerRegistry,
+            implicit registry: SamplePicklerRegistry,
       reader: PReader[P]): $tpe = $unpickleLogic
       }
       GenUnpickler
@@ -102,11 +102,10 @@ object SampleMaterializersImpl1 {
       s"""result =
            $result
        """.stripMargin)
-    c.Expr[Unpickler[T]](result)
+    c.Expr[SampleUnpickler[T]](result)
   }
 
-  def materializeCaseObjectName[T: c.WeakTypeTag](
-                                                   c: Context): c.Expr[PicklerRegistry.SingletonFullName[T]] = {
+  def materializeCaseObjectName[T: c.WeakTypeTag](c: Context): c.Expr[SamplePicklerRegistry.SampleSingletonFullName[T]] = {
     import c.universe._
 
     val tpe = weakTypeOf[T]
@@ -118,23 +117,21 @@ object SampleMaterializersImpl1 {
 
     val name = sym.fullName+"$"
     val result = q"""
-      new org.scalajs.spickling.PicklerRegistry.SingletonFullName[$tpe]($name)
+      new au.com.fairfax.adonis.json.SamplePicklerRegistry.SingletonFullName[$tpe]($name)
     """
 
-    c.Expr[PicklerRegistry.SingletonFullName[T]](result)
+    c.Expr[SamplePicklerRegistry.SampleSingletonFullName[T]](result)
   }
 }
 
-trait SampleMaterializersImpl1 {
-  implicit def materializePickler[T]: Pickler[T] =
+trait SampleMaterializers1 {
+  implicit def materializePickler[T]: SamplePickler[T] =
   macro SampleMaterializersImpl1.materializePickler[T]
 
-  implicit def materializeUnpickler[T]: Unpickler[T] =
+  implicit def materializeUnpickler[T]: SampleUnpickler[T] =
   macro SampleMaterializersImpl1.materializeUnpickler[T]
 
-  implicit def materializeCaseObjectName[T]: PicklerRegistry.SingletonFullName[T] =
+  implicit def materializeCaseObjectName[T]: SamplePicklerRegistry.SampleSingletonFullName[T] =
   macro SampleMaterializersImpl1.materializeCaseObjectName[T]
 }
-
-object Sample1 extends SampleMaterializersImpl1
 
