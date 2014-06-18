@@ -5,6 +5,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.Context
 import scala.reflect.runtime.universe
 import au.com.fairfax.adonis.json.{SampleUnpickler, SamplePickler, SamplePicklerRegistry}
+import scala.language.implicitConversions
 
 object SampleMaterializersImpl1 {
   def materializePickler[T: c.WeakTypeTag](c: Context): c.Expr[SamplePickler[T]] = {
@@ -76,6 +77,7 @@ object SampleMaterializersImpl1 {
       val fieldName = accessor.name
       val fieldString = fieldName.toString()
       val fieldTpe = accessor.returnType.substituteTypes(typeParams, typeArgs)
+//      println(s"fieldTpe.toString = ${fieldTpe.toString}")
 
       q"""
         registry.unpickle(reader.readObjectField(

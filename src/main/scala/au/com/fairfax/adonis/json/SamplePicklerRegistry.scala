@@ -2,7 +2,7 @@ package au.com.fairfax.adonis.json
 
 import scala.reflect.ClassTag
 import scala.collection.mutable
-import org.scalajs.spickling.{PReader, PBuilder}
+import au.com.fairfax.adonis.utils.json.{JsonBuilder, JsonReader}
 import au.com.fairfax.adonis.apws.macros.SampleMaterializers1
 
 object SamplePicklerRegistry extends SampleBasePicklerRegistry {
@@ -12,10 +12,10 @@ object SamplePicklerRegistry extends SampleBasePicklerRegistry {
 }
 
 trait SamplePicklerRegistry {
-  def pickle[P](value: Any)(implicit builder: PBuilder[P],
+  def pickle[P](value: Any)(implicit builder: JsonBuilder[P],
                             registry: SamplePicklerRegistry = this): P
 
-  def unpickle[P](pickle: P)(implicit reader: PReader[P],
+  def unpickle[P](pickle: P)(implicit reader: JsonReader[P],
                              registry: SamplePicklerRegistry = this): Any
 }
 
@@ -34,6 +34,11 @@ class SampleBasePicklerRegistry extends SamplePicklerRegistry {
                                unpickler: SampleUnpickler[_]): Unit = {
     picklers(clazz.getName) = pickler
     unpicklers(clazz.getName) = unpickler
+    println(
+      s"""${getClass.getSimpleName}
+         |picklers = $picklers
+         |unpicklers = $unpicklers
+       """.stripMargin)
   }
 
   def register[A: ClassTag](pickler: SamplePickler[A],
@@ -54,7 +59,7 @@ class SampleBasePicklerRegistry extends SamplePicklerRegistry {
     singletonsRev(name.name) = obj
   }
 
-  def pickle[P](value: Any)(implicit builder: PBuilder[P],
+  def pickle[P](value: Any)(implicit builder: JsonBuilder[P],
                             registry: SamplePicklerRegistry): P = {
     if (value == null) {
       builder.makeNull()
@@ -72,7 +77,7 @@ class SampleBasePicklerRegistry extends SamplePicklerRegistry {
     }
   }
 
-  def unpickle[P](pickle: P)(implicit reader: PReader[P],
+  def unpickle[P](pickle: P)(implicit reader: JsonReader[P],
                              registry: SamplePicklerRegistry): Any = {
     if (reader.isNull(pickle)) {
       null
