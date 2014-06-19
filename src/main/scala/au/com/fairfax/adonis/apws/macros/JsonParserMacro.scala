@@ -15,10 +15,6 @@ object JsonParserMacro {
 
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
       println(s"tpe = $tpe, jsValueVar = $jsValueVar, fieldName = $fieldName")
-      if (!tpe.typeSymbol.asClass.isCaseClass) {
-        c.error(c.enclosingPosition, "Cannot materialize JsonParser for non-case class")
-        return q"null"
-      }
 
       val newJsValueVar = s"${jsValueVar}_$fieldName"
       val jsonExtract = s"val $newJsValueVar = ($jsValueVar \\ ${"\""}$fieldName${"\""}).asInstanceOf"
@@ -30,6 +26,11 @@ object JsonParserMacro {
 
       accessors match {
         case x :: _ =>
+          if (!tpe.typeSymbol.asClass.isCaseClass) {
+            c.error(c.enclosingPosition, "Cannot materialize JsonParser for non-case class")
+            return q"null"
+          }
+
           val constrArgs = accessors map {
             accessor =>
               val fieldName = accessor.name.toString
@@ -48,7 +49,8 @@ object JsonParserMacro {
         case _ =>
           q"""
               {
-                $jsonExtract[JsNumber].value.toDouble
+                val ${newTermName(newJsValueVar)} = (${newTermName(jsValueVar)} \ $fieldName).asInstanceOf[JsNumber].value.toDouble
+                ${newTermName(newJsValueVar)}
               }
           """
       }
