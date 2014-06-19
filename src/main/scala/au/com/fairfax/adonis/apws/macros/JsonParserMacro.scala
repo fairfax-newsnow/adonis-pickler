@@ -5,7 +5,6 @@ import scala.language.experimental.macros
 
 import scala.reflect.macros.Context
 import scala.reflect.runtime.universe
-import au.com.fairfax.adonis.json.SampleUnpickler
 
 object JsonParserMacro {
   type ParserType = JsValue => Any
@@ -14,30 +13,58 @@ object JsonParserMacro {
   def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
     import c.universe._
 
-    val tpe = weakTypeOf[T]
-    val sym = tpe.typeSymbol.asClass
+    def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
+      println(s"tpe = $tpe, jsValueVar = $jsValueVar, fieldName = $fieldName")
+      if (!tpe.typeSymbol.asClass.isCaseClass) {
+        c.error(c.enclosingPosition, "Cannot materialize JsonParser for non-case class")
+        return q"null"
+      }
 
-    if (!sym.isCaseClass) {
-      c.error(c.enclosingPosition,
-        "Cannot materialize JsonParser for non-case class")
-      return c.Expr[ParserType](q"null")
+      val newJsValueVar = s"${jsValueVar}_$fieldName"
+      val jsonExtract = s"val $newJsValueVar = ($jsValueVar \\ ${"\""}$fieldName${"\""}).asInstanceOf"
+      println(s"jsonExtract = $jsonExtract")
+
+      val accessors = (tpe.declarations collect {
+        case acc: MethodSymbol if acc.isCaseAccessor => acc
+      }).toList
+
+      accessors match {
+        case x :: _ =>
+          val constrArgs = accessors map {
+            accessor =>
+              val fieldName = accessor.name.toString
+              val fieldTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+              subExpr(fieldTpe)(newJsValueVar)(fieldName)
+          }
+          println(s"constrArgs = $constrArgs")
+
+          q"""
+            {
+              $jsonExtract[JsObject]
+              $tpe(..$constrArgs)
+            }
+          """
+
+        case _ =>
+          q"""
+              {
+                $jsonExtract[JsNumber].value.toDouble
+              }
+          """
+      }
     }
 
-    //    val result = q"""
-    //      implicit object GenUnpickler extends au.com.fairfax.adonis.json.SampleUnpickler[$tpe] {
-    //        import org.scalajs.spickling._
-    //        import au.com.fairfax.adonis.json._
-    //        override def unpickle[P](pickle: P)(
-    //            implicit registry: SamplePicklerRegistry,
-    //      reader: PReader[P]): $tpe = $unpickleLogic
-    //      }
-    //      GenUnpickler
-    //    """
+    val quote = subExpr(weakTypeOf[T])("rootJsValue")("args")
 
-    val result = q"""
-                     def parse(jsValue: play.api.libs.json.JsValue): Any = "testing"
-                     parse _
-                     """
+    val result =
+      q"""
+          import play.api.libs.json._
+          def parse(rootJsValue: JsValue): Any = {
+            $quote
+          }
+          parse _
+      """
+
     println(
       s"""result =
            $result
