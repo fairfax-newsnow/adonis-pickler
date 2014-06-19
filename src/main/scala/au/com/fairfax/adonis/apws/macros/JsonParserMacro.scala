@@ -16,10 +16,6 @@ object JsonParserMacro {
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
       println(s"tpe = $tpe, jsValueVar = $jsValueVar, fieldName = $fieldName")
 
-      val newJsValueVar = s"${jsValueVar}_$fieldName"
-      val jsonExtract = s"val $newJsValueVar = ($jsValueVar \\ ${"\""}$fieldName${"\""}).asInstanceOf"
-      println(s"jsonExtract = $jsonExtract")
-
       val accessors = (tpe.declarations collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
@@ -31,6 +27,8 @@ object JsonParserMacro {
             return q"null"
           }
 
+          val newJsValueVar = s"${jsValueVar}_$fieldName"
+
           val constrArgs = accessors map {
             accessor =>
               val fieldName = accessor.name.toString
@@ -41,7 +39,7 @@ object JsonParserMacro {
 
           q"""
             {
-              $jsonExtract[JsObject]
+              val ${TermName(newJsValueVar)} = (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsObject]
               $tpe(..$constrArgs)
             }
           """
