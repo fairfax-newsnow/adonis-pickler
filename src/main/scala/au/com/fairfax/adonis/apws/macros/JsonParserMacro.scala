@@ -40,7 +40,7 @@ object JsonParserMacro {
           q"""
             {
               val ${TermName(newJsValueVar)} = (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsObject]
-              $tpe(..$constrArgs)
+              new $tpe(..$constrArgs)
             }
           """
 
