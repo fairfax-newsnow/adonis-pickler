@@ -8,13 +8,14 @@ import scala.reflect.runtime.universe
 
 object JsonParserMacro {
   type ParserType = JsValue => Any
-  val prefix = "jsVal"
 
   def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
     import c.universe._
 
+    val rootJsValue = "rootJsValue"
+
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
-      println(s"tpe = $tpe, jsValueVar = $jsValueVar, fieldName = $fieldName")
+      //      println(s"tpe = $tpe, jsValueVar = $jsValueVar, fieldName = $fieldName")
 
       val accessors = (tpe.declarations collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
@@ -35,7 +36,7 @@ object JsonParserMacro {
               val fieldTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
               subExpr(fieldTpe)(newJsValueVar)(fieldName)
           }
-          println(s"constrArgs = $constrArgs")
+          //          println(s"constrArgs = $constrArgs")
 
           q"""
             {
@@ -45,6 +46,7 @@ object JsonParserMacro {
           """
 
         case _ =>
+          println(s"tpe.dealias = ${tpe.dealias}")
           q"""
               {
                 (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsNumber].value.toDouble
@@ -53,19 +55,16 @@ object JsonParserMacro {
       }
     }
 
-    val quote = subExpr(weakTypeOf[T])("rootJsValue")("args")
-
     val result =
       q"""
           import play.api.libs.json._
-          def parse(rootJsValue: JsValue): Any = {
-            $quote
+          def parse(${TermName(rootJsValue)}: JsValue): Any = {
+            ${subExpr(weakTypeOf[T])(rootJsValue)("args")}
           }
           parse _
       """
 
-    println(
-      s"""result =
+    println( s"""result =
            $result
        """.stripMargin)
     c.Expr[ParserType](result)
@@ -73,10 +72,8 @@ object JsonParserMacro {
 
 }
 
+import JsonParserMacro._
+
 object JsonMaterializers {
-
-  import JsonParserMacro._
-
-  def materializeJsonParser[T]: ParserType = macro JsonParserMacro.materializeJsonParser[T]
-
+  def jsonParserMacro[T]: ParserType = macro materializeJsonParser[T]
 }
