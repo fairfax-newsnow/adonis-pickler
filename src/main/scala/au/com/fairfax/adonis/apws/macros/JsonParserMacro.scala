@@ -14,9 +14,7 @@ object JsonParserMacro {
 
     val rootJsValue = "rootJsValue"
 
-    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long]) map typeToString
-
-    def typeToString(tpe: c.universe.Type): String = tpe.toString
+    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
     def numQuote(jsValueVar: String)(fieldName: String)(typeStr: String) =
       q"""
@@ -57,21 +55,26 @@ object JsonParserMacro {
           """
 
         case _ =>
-          val typeStr = tpe.toString
-          typeStr match {
-            case t: String if numTypes contains t => numQuote(jsValueVar)(fieldName)(typeStr)
-            case t: String if t == typeToString(typeOf[Boolean]) =>
+          tpe match {
+            case t: Type if numTypes contains t => numQuote(jsValueVar)(fieldName)(t.toString)
+            case t: Type if t == typeOf[Boolean] =>
               q"""
                   {
                     (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsBoolean].value
                   }
               """
-            case _ =>
+            case t: Type if t == typeOf[String] =>
               q"""
                   {
                     (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsString].value
                   }
               """
+//            case t: Type if t.typeSymbol.asClass.getClass == classOf[List[_]].getName =>
+//              q"""
+//                  {
+//                    (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsArray].value
+//                  }
+//              """
           }
       }
     }
@@ -93,10 +96,39 @@ object JsonParserMacro {
     c.Expr[ParserType](result)
   }
 
+  def testMaterialize[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
+    import c.universe._
+
+    val tpe = weakTypeOf[T]
+
+    println(s"tpe = $tpe, tpe.typeSymbol.asClass.getName = ${tpe.typeSymbol.asClass.fullName}")
+    println(s"tpe.typeArgs = ${tpe.typeArgs}")
+
+    val accessors = (tpe.declarations collect {
+      case acc: MethodSymbol if acc.isCaseAccessor => acc
+    }).toList
+
+    val accessor = accessors.head
+    println(s"fieldName = ${accessor.name.toString}")
+    val accessorType = accessor.returnType
+    println(s"accessorType without type params substitution = ${accessorType}")
+    val subsitutedAccType = accessorType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+    println(s"accessorType with type params substitution = $subsitutedAccType")
+
+    val result =
+      q"""
+          import play.api.libs.json._
+          def parser(jsValue: JsValue): Any = "testing"
+          parser _
+      """
+    c.Expr[ParserType](result)
+  }
 }
 
 import JsonParserMacro._
 
 object JsonMaterializers {
   def jsonParserMacro[T]: ParserType = macro materializeJsonParser[T]
+
+  def test[T]: ParserType = macro testMaterialize[T]
 }
