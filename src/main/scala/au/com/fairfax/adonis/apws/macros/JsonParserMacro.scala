@@ -49,8 +49,7 @@ object JsonParserMacro {
         case _ =>
           q"""
               {
-                val ${newTermName(newJsValueVar)} = (${newTermName(jsValueVar)} \ $fieldName).asInstanceOf[JsNumber].value.toDouble
-                ${newTermName(newJsValueVar)}
+                (${TermName(jsValueVar)} \ $fieldName).asInstanceOf[JsNumber].value.toDouble
               }
           """
       }
