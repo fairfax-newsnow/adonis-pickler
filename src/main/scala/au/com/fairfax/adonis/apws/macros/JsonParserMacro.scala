@@ -16,6 +16,7 @@ object JsonParserMacro {
 
     lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
+    // don't declare return type after def createItem(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
       val quote = q"""
         def parseCollection(jsArray: JsArray) = {
