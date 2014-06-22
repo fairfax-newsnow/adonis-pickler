@@ -58,18 +58,14 @@ object JsonParserMacro {
       """
     }
 
-    def extractFieldString(jsValueVar: String)(fieldName: String) =
+    def extractJsonField(jsValueVar: String)(fieldName: String) =
       if (fieldName == "")
         q"${TermName(jsValueVar)}"
       else
         q"(${TermName(jsValueVar)} \ $fieldName)"
 
     def numQuote(jsValueVar: String)(fieldName: String)(typeStr: String) =
-      q"""
-          {
-            ${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsNumber].value.${TermName("to" + typeStr)}
-          }
-      """
+      q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsNumber].value.${TermName("to" + typeStr)}"
 
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
       val accessors = (tpe.declarations collect {
@@ -90,41 +86,25 @@ object JsonParserMacro {
               subExpr(fieldTpe)(newJsValueVar)(fieldName)
           }
           q"""
-            {
-              val ${TermName(newJsValueVar)} = ${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsObject]
-              new $tpe(..$constrArgs)
-            }
+            val ${TermName(newJsValueVar)} = ${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsObject]
+            new $tpe(..$constrArgs)
           """
 
         case _ =>
           tpe match {
             case t: Type if numTypes contains t => numQuote(jsValueVar)(fieldName)(t.toString)
-            case t: Type if t == typeOf[Boolean] =>
-              q"""
-                  {
-                    ${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsBoolean].value
-                  }
-              """
-            case t: Type if t == typeOf[String] =>
-              q"""
-                  {
-                    ${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsString].value
-                  }
-              """
+            case t: Type if t == typeOf[Boolean] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsBoolean].value"
+            case t: Type if t == typeOf[String] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsString].value"
             case t: Type if t.typeSymbol.asClass.fullName == typeOf[List[_]].typeSymbol.asClass.fullName =>
               q"""
-                  {
-                    ${parseCollectionQuote(t.typeArgs.head)("List")}
-                    parseCollection(${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
-                  }
+                ${parseCollectionQuote(t.typeArgs.head)("List")}
+                parseCollection(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
               """
             case t: Type if t.typeSymbol.asClass.fullName == typeOf[Map[_, _]].typeSymbol.asClass.fullName =>
               val List(key, value) = t.typeArgs
               q"""
-                  {
-                    ${parseMapQuote(key)(value)}
-                    parseMap(${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
-                  }
+                ${parseMapQuote(key)(value)}
+                parseMap(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
               """
           }
       }
