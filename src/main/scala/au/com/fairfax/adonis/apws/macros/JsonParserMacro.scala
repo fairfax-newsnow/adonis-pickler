@@ -9,6 +9,10 @@ import scala.reflect.runtime.universe._
 object JsonParserMacro {
   type ParserType = JsValue => Any
 
+  val rootJsValue = "rootJsValue"
+  val parseCollectionMeth = "parseCollection"
+  val parseMapMeth = "parseMap"
+
   def createItemMeth(inStr: String): String =
     List("create", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
       s =>
@@ -20,10 +24,7 @@ object JsonParserMacro {
   def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
     import c.universe._
 
-    val rootJsValue = "rootJsValue"
-    val parseCollectionMeth = "parseCollection"
-    val parseMapMeth = "parseMap"
-    val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
     // don't declare return type after def ${TermName("create" + simplified)}(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
     def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
