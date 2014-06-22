@@ -9,24 +9,53 @@ import scala.reflect.runtime.universe._
 object JsonParserMacro {
   type ParserType = JsValue => Any
 
+  def createItemMeth(inStr: String): String =
+    List("create", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
+      s =>
+        val idx = s.lastIndexOf(".")
+        if (idx < 0) s
+        else s.substring(idx + 1, s.length)
+    }.mkString("_")
+
   def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
     import c.universe._
 
     val rootJsValue = "rootJsValue"
-
     lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
-    // don't declare return type after def createItem(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
+    // don't declare return type after def ${TermName("create" + simplified)}(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
+    def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
+      q"""
+        def ${TermName(createItemMeth)}(item: JsValue) =
+          ${subExpr(tpe)("item")("")}
+      """
+
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
-      val quote = q"""
+      val create = createItemMeth(tpe.toString)
+      q"""
         def parseCollection(jsArray: JsArray) = {
-          def createItem(item: JsValue) = {
-            ${subExpr(tpe)("item")("")}
-          }
-          jsArray.value.map(createItem).to[${TypeName(collType)}]
+          ${createItemQuote(tpe)(create)}
+          jsArray.value.map(${TermName(create)}).to[${TypeName(collType)}]
         }
       """
-      quote
+    }
+
+    def parseMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type) = {
+      val List(createKey, createVal) = List(keyTpe, valTpe) map (t => createItemMeth(t.toString))
+      var createQuote = List(createItemQuote(keyTpe)(createKey))
+      if (keyTpe != valTpe)
+        createQuote = createItemQuote(valTpe)(createVal) :: createQuote
+      q"""
+        def parseMap(jsArray: JsArray) = {
+          ..$createQuote
+          jsArray.value.map { item =>
+            val seq = item.asInstanceOf[JsArray].value
+            val key = seq(0)
+            val value = seq(1)
+            ${TermName(createKey)}(key) -> ${TermName(createVal)}(value)
+          }.toMap
+        }
+      """
     }
 
     def extractFieldString(jsValueVar: String)(fieldName: String) =
@@ -83,11 +112,18 @@ object JsonParserMacro {
                   }
               """
             case t: Type if t.typeSymbol.asClass.fullName == typeOf[List[_]].typeSymbol.asClass.fullName =>
-              assert(t.typeArgs.size == 1)
               q"""
                   {
                     ${parseCollectionQuote(t.typeArgs.head)("List")}
                     parseCollection(${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
+                  }
+              """
+            case t: Type if t.typeSymbol.asClass.fullName == typeOf[Map[_, _]].typeSymbol.asClass.fullName =>
+              val List(key, value) = t.typeArgs
+              q"""
+                  {
+                    ${parseMapQuote(key)(value)}
+                    parseMap(${extractFieldString(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
                   }
               """
           }
