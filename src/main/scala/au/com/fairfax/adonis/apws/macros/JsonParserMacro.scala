@@ -21,7 +21,9 @@ object JsonParserMacro {
     import c.universe._
 
     val rootJsValue = "rootJsValue"
-    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+    val parseCollectionMeth = "parseCollection"
+    val parseMapMeth = "parseMap"
+    val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
     // don't declare return type after def ${TermName("create" + simplified)}(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
     def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
@@ -33,7 +35,7 @@ object JsonParserMacro {
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
       val create = createItemMeth(tpe.toString)
       q"""
-        def parseCollection(jsArray: JsArray) = {
+        def ${TermName(parseCollectionMeth)}(jsArray: JsArray) = {
           ${createItemQuote(tpe)(create)}
           jsArray.value.map(${TermName(create)}).to[${TypeName(collType)}]
         }
@@ -46,7 +48,7 @@ object JsonParserMacro {
       if (keyTpe != valTpe)
         createQuote = createItemQuote(valTpe)(createVal) :: createQuote
       q"""
-        def parseMap(jsArray: JsArray) = {
+        def ${TermName(parseMapMeth)}(jsArray: JsArray) = {
           ..$createQuote
           jsArray.value.map { item =>
             val seq = item.asInstanceOf[JsArray].value
@@ -98,13 +100,13 @@ object JsonParserMacro {
             case t: Type if t.typeSymbol.asClass.fullName == typeOf[List[_]].typeSymbol.asClass.fullName =>
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)("List")}
-                parseCollection(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
+                ${TermName(parseCollectionMeth)}(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
               """
             case t: Type if t.typeSymbol.asClass.fullName == typeOf[Map[_, _]].typeSymbol.asClass.fullName =>
               val List(key, value) = t.typeArgs
               q"""
                 ${parseMapQuote(key)(value)}
-                parseMap(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
+                ${TermName(parseMapMeth)}(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
               """
           }
       }
