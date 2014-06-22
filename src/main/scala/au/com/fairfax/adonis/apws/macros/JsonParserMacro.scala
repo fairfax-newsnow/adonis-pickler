@@ -75,6 +75,8 @@ object JsonParserMacro {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
 
+      val tpeSymClass: Type => String = _.typeSymbol.asClass.fullName
+
       accessors match {
         case x :: _ =>
           if (!tpe.typeSymbol.asClass.isCaseClass) {
@@ -98,12 +100,12 @@ object JsonParserMacro {
             case t: Type if numTypes contains t => numQuote(jsValueVar)(fieldName)(t.toString)
             case t: Type if t == typeOf[Boolean] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsBoolean].value"
             case t: Type if t == typeOf[String] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsString].value"
-            case t: Type if t.typeSymbol.asClass.fullName == typeOf[List[_]].typeSymbol.asClass.fullName =>
+            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)("List")}
                 ${TermName(parseCollectionMeth)}(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
               """
-            case t: Type if t.typeSymbol.asClass.fullName == typeOf[Map[_, _]].typeSymbol.asClass.fullName =>
+            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
               val List(key, value) = t.typeArgs
               q"""
                 ${parseMapQuote(key)(value)}
