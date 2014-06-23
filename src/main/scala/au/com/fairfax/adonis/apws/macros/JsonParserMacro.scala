@@ -1,15 +1,12 @@
 package au.com.fairfax.adonis.apws.macros
 
-import play.api.libs.json._
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
+import au.com.fairfax.adonis.utils.json._
 
 import scala.reflect.runtime.universe._
 
 object JsonParserMacro {
-  type ParserType = JsValue => Any
-
-  val rootJsValue = "rootJsValue"
   val parseCollectionMeth = "parseCollection"
   val parseMapMeth = "parseMap"
 
@@ -21,24 +18,25 @@ object JsonParserMacro {
         else s.substring(idx + 1, s.length)
     }.mkString("_")
 
-  def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[ParserType] = {
+  def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
-
-    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
     // don't declare return type after def ${TermName("create" + simplified)}(item: JsValue), o.w. will get meaningless error of type ... not found in macro call
     def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
       q"""
-        def ${TermName(createItemMeth)}(item: JsValue) =
+        def ${TermName(createItemMeth)}(item: P) =
           ${subExpr(tpe)("item")("")}
       """
 
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
       val create = createItemMeth(tpe.toString)
       q"""
-        def ${TermName(parseCollectionMeth)}(jsArray: JsArray) = {
+        def ${TermName(parseCollectionMeth)}(array: P) = {
           ${createItemQuote(tpe)(create)}
-          jsArray.value.map(${TermName(create)}).to[${TypeName(collType)}]
+          val arraySize = reader.readArrayLength(array)
+          (0 until arraySize).to[${TypeName(collType)}].map {
+            idx => ${TermName(create)}(reader.readArrayElem(array, idx))
+          }
         }
       """
     }
@@ -49,12 +47,13 @@ object JsonParserMacro {
       if (keyTpe != valTpe)
         createQuote = createItemQuote(valTpe)(createVal) :: createQuote
       q"""
-        def ${TermName(parseMapMeth)}(jsArray: JsArray) = {
+        def ${TermName(parseMapMeth)}(map: P) = {
           ..$createQuote
-          jsArray.value.map { item =>
-            val seq = item.asInstanceOf[JsArray].value
-            val key = seq(0)
-            val value = seq(1)
+          val mapSize = reader.readArrayLength(map)
+          (0 until mapSize).toList.map { idx =>
+            val tuple = reader.readArrayElem(map, idx)
+            val key = reader.readArrayElem(tuple, 0)
+            val value = reader.readArrayElem(tuple, 1)
             ${TermName(createKey)}(key) -> ${TermName(createVal)}(value)
           }.toMap
         }
@@ -65,10 +64,10 @@ object JsonParserMacro {
       if (fieldName == "")
         q"${TermName(jsValueVar)}"
       else
-        q"(${TermName(jsValueVar)} \ $fieldName)"
+        q"reader.readObjectField(${TermName(jsValueVar)}, $fieldName)"
 
-    def numQuote(jsValueVar: String)(fieldName: String)(typeStr: String) =
-      q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsNumber].value.${TermName("to" + typeStr)}"
+    def readDouble(jsValueVar: String)(fieldName: String) =
+      q"reader.readNumber(${extractJsonField(jsValueVar)(fieldName)})"
 
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
@@ -91,37 +90,44 @@ object JsonParserMacro {
               subExpr(fieldTpe)(newJsValueVar)(fieldName)
           }
           q"""
-            val ${TermName(newJsValueVar)} = ${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsObject]
+            val ${TermName(newJsValueVar)} = ${extractJsonField(jsValueVar)(fieldName)}
             new $tpe(..$constrArgs)
           """
 
         case _ =>
           tpe match {
-            case t: Type if numTypes contains t => numQuote(jsValueVar)(fieldName)(t.toString)
-            case t: Type if t == typeOf[Boolean] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsBoolean].value"
-            case t: Type if t == typeOf[String] => q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsString].value"
+            case t: Type if t == typeOf[Double] => readDouble(jsValueVar)(fieldName)
+            case t: Type if t == typeOf[Float] => q"${readDouble(jsValueVar)(fieldName)}.asInstanceOf[Float]"
+            case t: Type if t == typeOf[Short] => q"${readDouble(jsValueVar)(fieldName)}.asInstanceOf[Short]"
+            case t: Type if t == typeOf[Int] => q"${readDouble(jsValueVar)(fieldName)}.asInstanceOf[Int]"
+            case t: Type if t == typeOf[Long] => q"${readDouble(jsValueVar)(fieldName)}.asInstanceOf[Long]"
+            case t: Type if t == typeOf[Boolean] => q"reader.readBoolean(${extractJsonField(jsValueVar)(fieldName)})"
+            case t: Type if t == typeOf[String] => q"reader.readString(${extractJsonField(jsValueVar)(fieldName)})"
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)("List")}
-                ${TermName(parseCollectionMeth)}(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
+                ${TermName(parseCollectionMeth)}(${extractJsonField(jsValueVar)(fieldName)})
               """
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
               val List(key, value) = t.typeArgs
               q"""
                 ${parseMapQuote(key)(value)}
-                ${TermName(parseMapMeth)}(${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsArray])
+                ${TermName(parseMapMeth)}(${extractJsonField(jsValueVar)(fieldName)})
               """
           }
       }
     }
 
+    val tpe = weakTypeOf[T]
     val result =
       q"""
-          import play.api.libs.json._
-          def parse(${TermName(rootJsValue)}: JsValue): Any = {
-            ${subExpr(weakTypeOf[T])(rootJsValue)("args")}
+          object GenJsonParser extends au.com.fairfax.adonis.utils.json.JsonParser[$tpe] {
+            import org.scalajs.spickling._
+            override def parse[P](json: P)(implicit reader: PReader[P]) = {
+              ${subExpr(tpe)("json")("args")}
+            }
           }
-          parse _
+          GenJsonParser
       """
 
     println(
@@ -129,12 +135,12 @@ object JsonParserMacro {
            $result
        """.stripMargin)
 
-    c.Expr[ParserType](result)
+    c.Expr[JsonParser[T]](result)
   }
 }
 
 import JsonParserMacro._
 
 object JsonMaterializers {
-  def jsonParserMacro[T]: ParserType = macro materializeJsonParser[T]
+  def jsonParserMacro[T]: JsonParser[T] = macro materializeJsonParser[T]
 }
