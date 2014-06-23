@@ -2,8 +2,8 @@ package au.com.fairfax.adonis.apws.macros
 
 import play.api.libs.json._
 import scala.language.experimental.macros
+import scala.reflect.macros.blackbox._
 
-import scala.reflect.macros.Context
 import scala.reflect.runtime.universe._
 
 object JsonParserMacro {
@@ -71,7 +71,7 @@ object JsonParserMacro {
       q"${extractJsonField(jsValueVar)(fieldName)}.asInstanceOf[JsNumber].value.${TermName("to" + typeStr)}"
 
     def subExpr(tpe: c.universe.Type)(jsValueVar: String)(fieldName: String): c.universe.Tree = {
-      val accessors = (tpe.declarations collect {
+      val accessors = (tpe.decls collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
 
