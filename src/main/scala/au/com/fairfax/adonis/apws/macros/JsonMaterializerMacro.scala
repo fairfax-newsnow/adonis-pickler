@@ -5,13 +5,17 @@ import scala.reflect.macros.blackbox._
 import au.com.fairfax.adonis.utils.json._
 
 object MaterializersImpl {
-  def createItemMeth(inStr: String): String =
-    List("create", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
+  def simplifiedMeth(action: String)(inStr: String): String =
+    List(action, inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
       s =>
         val idx = s.lastIndexOf(".")
         if (idx < 0) s
         else s.substring(idx + 1, s.length)
     }.mkString("_")
+
+  val createItemMeth = simplifiedMeth("create") _
+
+  val formatItemMeth = simplifiedMeth("format") _
 
   def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
@@ -21,9 +25,9 @@ object MaterializersImpl {
     val jreader = "reader"
 
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
-    def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
+    def createItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
-        def ${TermName(createItemMeth)}(item: J) =
+        def ${TermName(method)}(item: J) =
           ${recurParseQuote(tpe)("item")("")}
       """
 
@@ -134,8 +138,28 @@ object MaterializersImpl {
   def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
 
+    val formatCollectionMeth = "formatCollection"
     val jbuilder = "builder"
-    
+
+    def formatItemQuote(tpe: c.universe.Type)(method: String) =
+      q"""
+        def ${TermName(method)}(obj: $tpe) =
+          ${recurFormatQuote(tpe)("obj")}
+      """
+
+    def formatCollectionQuote(tpe: c.universe.Type)(collType: String) = {
+      val formatMeth = formatItemMeth(tpe.toString)
+      q"""
+        def ${TermName(formatCollectionMeth)}(objList: ${TypeName(collType)}[$tpe]) = {
+          ${formatItemQuote(tpe)(formatMeth)}
+          val jsonList = objList.map {
+            obj => ${TermName(formatMeth)}(obj)
+          }
+          ${TermName(jbuilder)}.makeArray(jsonList: _*)
+        }
+      """
+    }
+
     def formatDoubleQuote(tpe: c.universe.Type)(objNm: String) = {
       val numQuote =
         if (tpe == typeOf[Double]) q"${TermName(objNm)}"
@@ -168,6 +192,7 @@ object MaterializersImpl {
           """
 
         case _ =>
+          lazy val tpeSymClass: Type => String = _.typeSymbol.asClass.fullName
           tpe match {
             case t: Type if t == typeOf[Double] => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Float] => formatDoubleQuote(t)(objNm)
@@ -176,6 +201,11 @@ object MaterializersImpl {
             case t: Type if t == typeOf[Long] => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
+            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
+              q"""
+                ${formatCollectionQuote(t.typeArgs.head)("List")}
+                ${TermName(formatCollectionMeth)}(${TermName(objNm)})
+              """
           }
       }
     }
