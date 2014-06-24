@@ -92,7 +92,7 @@ object MaterializersImpl {
           """
 
         case _ =>
-          lazy val tpeSymClass: Type => String = _.typeSymbol.asClass.fullName
+          lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
           tpe match {
             case t: Type if t == typeOf[Double] => readDoubleQuote(jsonVarNm)(fieldNm)
             case t: Type if t == typeOf[Float] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Float]"
@@ -101,13 +101,13 @@ object MaterializersImpl {
             case t: Type if t == typeOf[Long] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Long]"
             case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
-            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
+            case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
               val parseCollection = "parseCollection"
               q"""
-                ${parseCollectionQuote(t.typeArgs.head)("List")(parseCollection)}
+                ${parseCollectionQuote(t.typeArgs.head)(typeName(t))(parseCollection)}
                 ${TermName(parseCollection)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
-            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
+            case t: Type if typeName(t) == typeName(typeOf[Map[_, _]]) =>
               val parseMap = "parseMap"
               val List(key, value) = t.typeArgs
               q"""
@@ -209,7 +209,7 @@ object MaterializersImpl {
           """
 
         case _ =>
-          lazy val tpeSymClass: Type => String = _.typeSymbol.asClass.fullName
+          lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
           tpe match {
             case t: Type if t == typeOf[Double] => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Float] => formatDoubleQuote(t)(objNm)
@@ -218,13 +218,13 @@ object MaterializersImpl {
             case t: Type if t == typeOf[Long] => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
-            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
+            case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
               val formatCollection = "formatCollection"
               q"""
-                ${formatCollectionQuote(t.typeArgs.head)("List")(formatCollection)}
+                ${formatCollectionQuote(t.typeArgs.head)(typeName(t))(formatCollection)}
                 ${TermName(formatCollection)}(${TermName(objNm)})
               """
-            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
+            case t: Type if typeName(t) == typeName(typeOf[Map[_, _]]) =>
               val formatMap = "formatMap"
               val List(key, value) = t.typeArgs
               q"""
