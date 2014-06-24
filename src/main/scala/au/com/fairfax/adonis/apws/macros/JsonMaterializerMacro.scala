@@ -19,13 +19,12 @@ object MaterializersImpl {
     val parseCollectionMeth = "parseCollection"
     val parseMapMeth = "parseMap"
     val jreader = "reader"
-    val jformatter = "formatter"
 
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
       q"""
         def ${TermName(createItemMeth)}(item: J) =
-          ${recursiveExpr(tpe)("item")("")}
+          ${recurParseQuote(tpe)("item")("")}
       """
 
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
@@ -69,7 +68,7 @@ object MaterializersImpl {
     def readDouble(jsonVarNm: String)(fieldNm: String) =
       q"${TermName(jreader)}.readNumber(${extractJsonField(jsonVarNm)(fieldNm)})"
 
-    def recursiveExpr(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
+    def recurParseQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
@@ -85,7 +84,7 @@ object MaterializersImpl {
             accessor =>
               val fieldName = accessor.name.toString
               val fieldTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
-              recursiveExpr(fieldTpe)(newJsValueVar)(fieldName)
+              recurParseQuote(fieldTpe)(newJsValueVar)(fieldName)
           }
           q"""
             val ${TermName(newJsValueVar)} = ${extractJsonField(jsonVarNm)(fieldNm)}
@@ -123,23 +122,43 @@ object MaterializersImpl {
           object GenJsonParser extends au.com.fairfax.adonis.utils.json.JsonParser[$tpe] {
             import org.scalajs.spickling._
             override def parse[J](json: J)(implicit ${TermName(jreader)}: PReader[J]) = {
-              ${recursiveExpr(tpe)("json")("args")}
+              ${recurParseQuote(tpe)("json")("args")}
             }
           }
           GenJsonParser
       """
-
-    println(
-      s"""result =
-           $result
-       """.stripMargin)
-
+    println(result)
     c.Expr[JsonParser[T]](result)
   }
 
   def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
-    ???
+
+    val jbuilder = "builder"
+
+    def recurFormatQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
+      val accessors = (tpe.decls collect {
+        case acc: MethodSymbol if acc.isCaseAccessor => acc
+      }).toList
+
+      ???
+    }
+
+    val tpe = weakTypeOf[T]
+    val result =
+      q"""
+          object GenJsonFormatter extends au.com.fairfax.adonis.utils.json.JsonFormatter[$tpe] {
+            import org.scalajs.spickling._
+            override def format[J](obj: $tpe)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
+              ${TermName(jbuilder)}.makeObject(
+                "cmd" -> ${TermName(jbuilder)}.makeString(${tpe.toString})
+              )
+            }
+          }
+          GenJsonFormatter
+      """
+    println(result)
+    c.Expr[JsonFormatter[T]](result)
   }
 }
 
