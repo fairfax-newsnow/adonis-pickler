@@ -150,7 +150,22 @@ object MaterializersImpl {
 
       accessors match {
         case x :: _ =>
-          ???
+          if (!tpe.typeSymbol.asClass.isCaseClass) {
+            c.error(c.enclosingPosition, "Cannot materialize JsonFormatter for non-case class")
+            return q"null"
+          }
+          val jsonFields = accessors map {
+            accessor =>
+              val fieldName = accessor.name.toString
+              val fieldTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+              q"""
+                val ${TermName(fieldName)} = ${TermName(objNm)}.${TermName(fieldName)}
+                $fieldName -> ${recurFormatQuote(fieldTpe)(fieldName)}
+              """
+          }
+          q"""
+            ${TermName(jbuilder)}.makeObject(..$jsonFields)
+          """
 
         case _ =>
           tpe match {
