@@ -59,14 +59,14 @@ object MaterializersImpl {
       """
     }
 
-    def extractJsonField(jsonVarNm: String)(fieldNm: String) =
+    def readJsonFieldQuote(jsonVarNm: String)(fieldNm: String) =
       if (fieldNm == "")
         q"${TermName(jsonVarNm)}"
       else
         q"${TermName(jreader)}.readObjectField(${TermName(jsonVarNm)}, $fieldNm)"
 
-    def readDouble(jsonVarNm: String)(fieldNm: String) =
-      q"${TermName(jreader)}.readNumber(${extractJsonField(jsonVarNm)(fieldNm)})"
+    def readDoubleQuote(jsonVarNm: String)(fieldNm: String) =
+      q"${TermName(jreader)}.readNumber(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
 
     def recurParseQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
@@ -87,30 +87,30 @@ object MaterializersImpl {
               recurParseQuote(fieldTpe)(newJsValueVar)(fieldName)
           }
           q"""
-            val ${TermName(newJsValueVar)} = ${extractJsonField(jsonVarNm)(fieldNm)}
+            val ${TermName(newJsValueVar)} = ${readJsonFieldQuote(jsonVarNm)(fieldNm)}
             new $tpe(..$constrArgs)
           """
 
         case _ =>
           lazy val tpeSymClass: Type => String = _.typeSymbol.asClass.fullName
           tpe match {
-            case t: Type if t == typeOf[Double] => readDouble(jsonVarNm)(fieldNm)
-            case t: Type if t == typeOf[Float] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Float]"
-            case t: Type if t == typeOf[Short] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Short]"
-            case t: Type if t == typeOf[Int] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Int]"
-            case t: Type if t == typeOf[Long] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Long]"
-            case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${extractJsonField(jsonVarNm)(fieldNm)})"
-            case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${extractJsonField(jsonVarNm)(fieldNm)})"
+            case t: Type if t == typeOf[Double] => readDoubleQuote(jsonVarNm)(fieldNm)
+            case t: Type if t == typeOf[Float] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Float]"
+            case t: Type if t == typeOf[Short] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Short]"
+            case t: Type if t == typeOf[Int] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Int]"
+            case t: Type if t == typeOf[Long] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Long]"
+            case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
+            case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)("List")}
-                ${TermName(parseCollectionMeth)}(${extractJsonField(jsonVarNm)(fieldNm)})
+                ${TermName(parseCollectionMeth)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
               val List(key, value) = t.typeArgs
               q"""
                 ${parseMapQuote(key)(value)}
-                ${TermName(parseMapMeth)}(${extractJsonField(jsonVarNm)(fieldNm)})
+                ${TermName(parseMapMeth)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
           }
       }
@@ -135,13 +135,34 @@ object MaterializersImpl {
     import c.universe._
 
     val jbuilder = "builder"
+    
+    def formatDoubleQuote(tpe: c.universe.Type)(objNm: String) = {
+      val numQuote =
+        if (tpe == typeOf[Double]) q"${TermName(objNm)}"
+        else q"${TermName(objNm)}.asInstanceOf[Double]"
+      q"${TermName(jbuilder)}.makeNumber($numQuote)"
+    }
 
-    def recurFormatQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
+    def recurFormatQuote(tpe: c.universe.Type)(objNm: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
 
-      ???
+      accessors match {
+        case x :: _ =>
+          ???
+
+        case _ =>
+          tpe match {
+            case t: Type if t == typeOf[Double] => formatDoubleQuote(t)(objNm)
+            case t: Type if t == typeOf[Float] => formatDoubleQuote(t)(objNm)
+            case t: Type if t == typeOf[Short] => formatDoubleQuote(t)(objNm)
+            case t: Type if t == typeOf[Int] => formatDoubleQuote(t)(objNm)
+            case t: Type if t == typeOf[Long] => formatDoubleQuote(t)(objNm)
+            case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
+            case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
+          }
+      }
     }
 
     val tpe = weakTypeOf[T]
@@ -151,7 +172,8 @@ object MaterializersImpl {
             import org.scalajs.spickling._
             override def format[J](obj: $tpe)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
               ${TermName(jbuilder)}.makeObject(
-                "cmd" -> ${TermName(jbuilder)}.makeString(${tpe.toString})
+                "cmd" -> ${TermName(jbuilder)}.makeString(${tpe.toString}),
+                "args" -> ${recurFormatQuote(tpe)("obj")}
               )
             }
           }
