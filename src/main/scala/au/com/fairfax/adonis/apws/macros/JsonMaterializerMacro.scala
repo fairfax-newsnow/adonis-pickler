@@ -13,16 +13,12 @@ object MaterializersImpl {
         else s.substring(idx + 1, s.length)
     }.mkString("_")
 
-  val createItemMeth = simplifiedMeth("create") _
-
-  val formatItemMeth = simplifiedMeth("format") _
-
   def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
 
-    val parseCollectionMeth = "parseCollection"
-    val parseMapMeth = "parseMap"
     val jreader = "reader"
+
+    val createItemMeth = simplifiedMeth("create") _
 
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(method: String) =
@@ -31,10 +27,10 @@ object MaterializersImpl {
           ${recurParseQuote(tpe)("item")("")}
       """
 
-    def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
+    def parseCollectionQuote(tpe: c.universe.Type)(collType: String)(methodNm: String) = {
       val createMeth = createItemMeth(tpe.toString)
       q"""
-        def ${TermName(parseCollectionMeth)}(array: J) = {
+        def ${TermName(methodNm)}(array: J) = {
           ${createItemQuote(tpe)(createMeth)}
           val arraySize = ${TermName(jreader)}.readArrayLength(array)
           (0 until arraySize).to[${TypeName(collType)}].map {
@@ -44,13 +40,13 @@ object MaterializersImpl {
       """
     }
 
-    def parseMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type) = {
+    def parseMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String) = {
       val List(createKeyMeth, createValMeth) = List(keyTpe, valTpe) map (t => createItemMeth(t.toString))
       var createQuote = List(createItemQuote(keyTpe)(createKeyMeth))
       if (keyTpe != valTpe)
         createQuote = createItemQuote(valTpe)(createValMeth) :: createQuote
       q"""
-        def ${TermName(parseMapMeth)}(map: J) = {
+        def ${TermName(methodNm)}(map: J) = {
           ..$createQuote
           val mapSize = ${TermName(jreader)}.readArrayLength(map)
           (0 until mapSize).toList.map { idx =>
@@ -106,15 +102,17 @@ object MaterializersImpl {
             case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
+              val parseCollection = "parseCollection"
               q"""
-                ${parseCollectionQuote(t.typeArgs.head)("List")}
-                ${TermName(parseCollectionMeth)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
+                ${parseCollectionQuote(t.typeArgs.head)("List")(parseCollection)}
+                ${TermName(parseCollection)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
+              val parseMap = "parseMap"
               val List(key, value) = t.typeArgs
               q"""
-                ${parseMapQuote(key)(value)}
-                ${TermName(parseMapMeth)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
+                ${parseMapQuote(key)(value)(parseMap)}
+                ${TermName(parseMap)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
           }
       }
@@ -138,9 +136,9 @@ object MaterializersImpl {
   def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
 
-    val formatCollectionMeth = "formatCollection"
-    val formatMapMeth = "formatMap"
     val jbuilder = "builder"
+
+    val formatItemMeth = simplifiedMeth("format") _
 
     def formatItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
@@ -148,10 +146,10 @@ object MaterializersImpl {
           ${recurFormatQuote(tpe)("obj")}
       """
 
-    def formatCollectionQuote(tpe: c.universe.Type)(collType: String) = {
+    def formatCollectionQuote(tpe: c.universe.Type)(collType: String)(methodNm: String) = {
       val formatMeth = formatItemMeth(tpe.toString)
       q"""
-        def ${TermName(formatCollectionMeth)}(objList: ${TypeName(collType)}[$tpe]) = {
+        def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
           ${formatItemQuote(tpe)(formatMeth)}
           val jsonList = objList.map {
             obj => ${TermName(formatMeth)}(obj)
@@ -161,13 +159,13 @@ object MaterializersImpl {
       """
     }
 
-    def formatMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type) = {
+    def formatMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String) = {
       val List(formatKeyMeth, formatValMeth) = List(keyTpe, valTpe) map (t => formatItemMeth(t.toString))
       var formatQuote = List(formatItemQuote(keyTpe)(formatKeyMeth))
       if (keyTpe != valTpe)
         formatQuote = formatItemQuote(valTpe)(formatValMeth) :: formatQuote
       q"""
-        def ${TermName(formatMapMeth)}(map: $keyTpe Map $valTpe) = {
+        def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
           ..$formatQuote
           val elems =
             map.map { t =>
@@ -221,15 +219,17 @@ object MaterializersImpl {
             case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
+              val formatCollection = "formatCollection"
               q"""
-                ${formatCollectionQuote(t.typeArgs.head)("List")}
-                ${TermName(formatCollectionMeth)}(${TermName(objNm)})
+                ${formatCollectionQuote(t.typeArgs.head)("List")(formatCollection)}
+                ${TermName(formatCollection)}(${TermName(objNm)})
               """
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
+              val formatMap = "formatMap"
               val List(key, value) = t.typeArgs
               q"""
-                ${formatMapQuote(key)(value)}
-                ${TermName(formatMapMeth)}(${TermName(objNm)})
+                ${formatMapQuote(key)(value)(formatMap)}
+                ${TermName(formatMap)}(${TermName(objNm)})
               """
           }
       }
