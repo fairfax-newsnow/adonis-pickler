@@ -139,6 +139,7 @@ object MaterializersImpl {
     import c.universe._
 
     val formatCollectionMeth = "formatCollection"
+    val formatMapMeth = "formatMap"
     val jbuilder = "builder"
 
     def formatItemQuote(tpe: c.universe.Type)(method: String) =
@@ -156,6 +157,24 @@ object MaterializersImpl {
             obj => ${TermName(formatMeth)}(obj)
           }
           ${TermName(jbuilder)}.makeArray(jsonList: _*)
+        }
+      """
+    }
+
+    def formatMapQuote(keyTpe: c.universe.Type)(valTpe: c.universe.Type) = {
+      val List(formatKeyMeth, formatValMeth) = List(keyTpe, valTpe) map (t => formatItemMeth(t.toString))
+      var formatQuote = List(formatItemQuote(keyTpe)(formatKeyMeth))
+      if (keyTpe != valTpe)
+        formatQuote = formatItemQuote(valTpe)(formatValMeth) :: formatQuote
+      q"""
+        def ${TermName(formatMapMeth)}(map: $keyTpe Map $valTpe) = {
+          ..$formatQuote
+          val elems =
+            map.map { t =>
+              val (k, v) = t
+              ${TermName(jbuilder)}.makeArray(${TermName(formatKeyMeth)}(k), ${TermName(formatValMeth)}(v))
+            }.toList
+          ${TermName(jbuilder)}.makeArray(elems: _*)
         }
       """
     }
@@ -205,6 +224,12 @@ object MaterializersImpl {
               q"""
                 ${formatCollectionQuote(t.typeArgs.head)("List")}
                 ${TermName(formatCollectionMeth)}(${TermName(objNm)})
+              """
+            case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[Map[_, _]]) =>
+              val List(key, value) = t.typeArgs
+              q"""
+                ${formatMapQuote(key)(value)}
+                ${TermName(formatMapMeth)}(${TermName(objNm)})
               """
           }
       }
