@@ -4,12 +4,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
 import au.com.fairfax.adonis.utils.json._
 
-import scala.reflect.runtime.universe._
-
-object JsonParserMacro {
-  val parseCollectionMeth = "parseCollection"
-  val parseMapMeth = "parseMap"
-
+object MaterializersImpl {
   def createItemMeth(inStr: String): String =
     List("create", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
       s =>
@@ -18,24 +13,29 @@ object JsonParserMacro {
         else s.substring(idx + 1, s.length)
     }.mkString("_")
 
-  def materializeJsonParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
+  def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
 
-    // don't declare return type after def ${TermName(createItemMeth)}(item: P), o.w. will get meaningless error of type ... not found in macro call
+    val parseCollectionMeth = "parseCollection"
+    val parseMapMeth = "parseMap"
+    val jreader = "reader"
+    val jformatter = "formatter"
+
+    // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(createItemMeth: String) =
       q"""
-        def ${TermName(createItemMeth)}(item: P) =
-          ${subExpr(tpe)("item")("")}
+        def ${TermName(createItemMeth)}(item: J) =
+          ${recursiveExpr(tpe)("item")("")}
       """
 
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String) = {
       val createMeth = createItemMeth(tpe.toString)
       q"""
-        def ${TermName(parseCollectionMeth)}(array: P) = {
+        def ${TermName(parseCollectionMeth)}(array: J) = {
           ${createItemQuote(tpe)(createMeth)}
-          val arraySize = reader.readArrayLength(array)
+          val arraySize = ${TermName(jreader)}.readArrayLength(array)
           (0 until arraySize).to[${TypeName(collType)}].map {
-            idx => ${TermName(createMeth)}(reader.readArrayElem(array, idx))
+            idx => ${TermName(createMeth)}(${TermName(jreader)}.readArrayElem(array, idx))
           }
         }
       """
@@ -47,13 +47,13 @@ object JsonParserMacro {
       if (keyTpe != valTpe)
         createQuote = createItemQuote(valTpe)(createValMeth) :: createQuote
       q"""
-        def ${TermName(parseMapMeth)}(map: P) = {
+        def ${TermName(parseMapMeth)}(map: J) = {
           ..$createQuote
-          val mapSize = reader.readArrayLength(map)
+          val mapSize = ${TermName(jreader)}.readArrayLength(map)
           (0 until mapSize).toList.map { idx =>
-            val tuple = reader.readArrayElem(map, idx)
-            val key = reader.readArrayElem(tuple, 0)
-            val value = reader.readArrayElem(tuple, 1)
+            val tuple = ${TermName(jreader)}.readArrayElem(map, idx)
+            val key = ${TermName(jreader)}.readArrayElem(tuple, 0)
+            val value = ${TermName(jreader)}.readArrayElem(tuple, 1)
             ${TermName(createKeyMeth)}(key) -> ${TermName(createValMeth)}(value)
           }.toMap
         }
@@ -64,12 +64,12 @@ object JsonParserMacro {
       if (fieldNm == "")
         q"${TermName(jsonVarNm)}"
       else
-        q"reader.readObjectField(${TermName(jsonVarNm)}, $fieldNm)"
+        q"${TermName(jreader)}.readObjectField(${TermName(jsonVarNm)}, $fieldNm)"
 
     def readDouble(jsonVarNm: String)(fieldNm: String) =
-      q"reader.readNumber(${extractJsonField(jsonVarNm)(fieldNm)})"
+      q"${TermName(jreader)}.readNumber(${extractJsonField(jsonVarNm)(fieldNm)})"
 
-    def subExpr(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
+    def recursiveExpr(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
         case acc: MethodSymbol if acc.isCaseAccessor => acc
       }).toList
@@ -85,7 +85,7 @@ object JsonParserMacro {
             accessor =>
               val fieldName = accessor.name.toString
               val fieldTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
-              subExpr(fieldTpe)(newJsValueVar)(fieldName)
+              recursiveExpr(fieldTpe)(newJsValueVar)(fieldName)
           }
           q"""
             val ${TermName(newJsValueVar)} = ${extractJsonField(jsonVarNm)(fieldNm)}
@@ -100,8 +100,8 @@ object JsonParserMacro {
             case t: Type if t == typeOf[Short] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Short]"
             case t: Type if t == typeOf[Int] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Int]"
             case t: Type if t == typeOf[Long] => q"${readDouble(jsonVarNm)(fieldNm)}.asInstanceOf[Long]"
-            case t: Type if t == typeOf[Boolean] => q"reader.readBoolean(${extractJsonField(jsonVarNm)(fieldNm)})"
-            case t: Type if t == typeOf[String] => q"reader.readString(${extractJsonField(jsonVarNm)(fieldNm)})"
+            case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${extractJsonField(jsonVarNm)(fieldNm)})"
+            case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${extractJsonField(jsonVarNm)(fieldNm)})"
             case t: Type if tpeSymClass(t) == tpeSymClass(typeOf[List[_]]) =>
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)("List")}
@@ -122,8 +122,8 @@ object JsonParserMacro {
       q"""
           object GenJsonParser extends au.com.fairfax.adonis.utils.json.JsonParser[$tpe] {
             import org.scalajs.spickling._
-            override def parse[P](json: P)(implicit reader: PReader[P]) = {
-              ${subExpr(tpe)("json")("args")}
+            override def parse[J](json: J)(implicit ${TermName(jreader)}: PReader[J]) = {
+              ${recursiveExpr(tpe)("json")("args")}
             }
           }
           GenJsonParser
@@ -136,11 +136,15 @@ object JsonParserMacro {
 
     c.Expr[JsonParser[T]](result)
   }
+
+  def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
+    import c.universe._
+    ???
+  }
 }
 
-object JsonMaterializers {
+object JsonMaterializerMacro {
+  def jsonParserMacro[T]: JsonParser[T] = macro MaterializersImpl.materializeParser[T]
 
-  import JsonParserMacro._
-
-  def jsonParserMacro[T]: JsonParser[T] = macro materializeJsonParser[T]
+  def jsonFormatterMacro[T]: JsonFormatter[T] = macro MaterializersImpl.materializeFormatter[T]
 }
