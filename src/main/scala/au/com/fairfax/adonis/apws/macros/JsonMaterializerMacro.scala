@@ -18,7 +18,11 @@ object MaterializersImpl {
 
     val jreader = "reader"
 
-    val createItemMeth = simplifiedMeth("create") _
+    lazy val createItemMeth = simplifiedMeth("create") _
+
+    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+
+    lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
 
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(method: String) =
@@ -65,8 +69,11 @@ object MaterializersImpl {
       else
         q"${TermName(jreader)}.readObjectField(${TermName(jsonVarNm)}, $fieldNm)"
 
-    def readDoubleQuote(jsonVarNm: String)(fieldNm: String) =
-      q"${TermName(jreader)}.readNumber(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
+    def readDoubleQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String) = {
+      val quote = q"${TermName(jreader)}.readNumber(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
+      if (tpe == typeOf[Double]) quote
+      else q"${quote}.asInstanceOf[$tpe]"
+    }
 
     def recurParseQuote(tpe: c.universe.Type)(jsonVarNm: String)(fieldNm: String): c.universe.Tree = {
       val accessors = (tpe.decls collect {
@@ -92,13 +99,8 @@ object MaterializersImpl {
           """
 
         case _ =>
-          lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
           tpe match {
-            case t: Type if t == typeOf[Double] => readDoubleQuote(jsonVarNm)(fieldNm)
-            case t: Type if t == typeOf[Float] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Float]"
-            case t: Type if t == typeOf[Short] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Short]"
-            case t: Type if t == typeOf[Int] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Int]"
-            case t: Type if t == typeOf[Long] => q"${readDoubleQuote(jsonVarNm)(fieldNm)}.asInstanceOf[Long]"
+            case t: Type if numTypes contains t => readDoubleQuote(t)(jsonVarNm)(fieldNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
@@ -138,7 +140,11 @@ object MaterializersImpl {
 
     val jbuilder = "builder"
 
-    val formatItemMeth = simplifiedMeth("format") _
+    lazy val formatItemMeth = simplifiedMeth("format") _
+
+    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+
+    lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
 
     def formatItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
@@ -209,13 +215,8 @@ object MaterializersImpl {
           """
 
         case _ =>
-          lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
           tpe match {
-            case t: Type if t == typeOf[Double] => formatDoubleQuote(t)(objNm)
-            case t: Type if t == typeOf[Float] => formatDoubleQuote(t)(objNm)
-            case t: Type if t == typeOf[Short] => formatDoubleQuote(t)(objNm)
-            case t: Type if t == typeOf[Int] => formatDoubleQuote(t)(objNm)
-            case t: Type if t == typeOf[Long] => formatDoubleQuote(t)(objNm)
+            case t: Type if numTypes contains t => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
             case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
