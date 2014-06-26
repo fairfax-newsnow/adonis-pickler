@@ -16,11 +16,13 @@ object MaterializersImpl {
 
     lazy val createItemMeth = simplifiedMeth("create") _
 
-    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+    lazy val tpeClassNm: Type => String = _.typeSymbol.asClass.name.toString
 
-    lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
+    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm
 
-    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map typeName
+    def deliasTpeName[T: TypeTag]: String = typeOf[T].dealias.toString
+
+    lazy val numDealisTpeNms = List(deliasTpeName[Double], deliasTpeName[Float], deliasTpeName[Short], deliasTpeName[Int], deliasTpeName[Long])
 
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(method: String) =
@@ -38,7 +40,7 @@ object MaterializersImpl {
           }
         """
       val toCollQuote =
-        if (collType == typeName(typeOf[Seq[_]])) mapQuote
+        if (collType == tpeClassNm(typeOf[Seq[_]])) mapQuote
         else q"""
           ${mapQuote}.${TermName("to" + collType)}
         """
@@ -107,17 +109,18 @@ object MaterializersImpl {
           """
 
         case _ =>
+          println(s"recurParseQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}")
           tpe match {
-            case t: Type if numTypes contains t => readDoubleQuote(t)(jsonVarNm)(fieldNm)
-            case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
-            case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
-            case t: Type if collTypes contains typeName(t) =>
+            case t: Type if numDealisTpeNms contains t.dealias.toString => readDoubleQuote(t)(jsonVarNm)(fieldNm)
+            case t: Type if deliasTpeName[Boolean] == t.dealias.toString => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
+            case t: Type if deliasTpeName[String] == t.dealias.toString => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
+            case t: Type if collTypes contains tpeClassNm(t) =>
               val parseCollection = "parseCollection"
               q"""
-                ${parseCollectionQuote(t.typeArgs.head)(typeName(t))(parseCollection)}
+                ${parseCollectionQuote(t.typeArgs.head)(tpeClassNm(t))(parseCollection)}
                 ${TermName(parseCollection)}(${readJsonFieldQuote(jsonVarNm)(fieldNm)})
               """
-            case t: Type if typeName(t) == typeName(typeOf[Map[_, _]]) =>
+            case t: Type if tpeClassNm(typeOf[Map[_, _]]) == tpeClassNm(t) =>
               val parseMap = "parseMap"
               val List(key, value) = t.typeArgs
               q"""
@@ -150,11 +153,13 @@ object MaterializersImpl {
 
     lazy val formatItemMeth = simplifiedMeth("format") _
 
-    lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
+    lazy val tpeClassNm: Type => String = _.typeSymbol.asClass.name.toString
 
-    lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
+    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm
 
-    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map typeName
+    def deliasTpeName[T: TypeTag]: String = typeOf[T].dealias.toString
+
+    lazy val numDealisTpeNms = List(deliasTpeName[Double], deliasTpeName[Float], deliasTpeName[Short], deliasTpeName[Int], deliasTpeName[Long])
 
     def formatItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
@@ -225,17 +230,18 @@ object MaterializersImpl {
           """
 
         case _ =>
+          println(s"recurFormatQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}")
           tpe match {
-            case t: Type if numTypes contains t => formatDoubleQuote(t)(objNm)
-            case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
-            case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
-            case t: Type if collTypes contains typeName(t) =>
+            case t: Type if numDealisTpeNms contains t.dealias.toString => formatDoubleQuote(t)(objNm)
+            case t: Type if deliasTpeName[Boolean] == t.dealias.toString  => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
+            case t: Type if deliasTpeName[String] == t.dealias.toString => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
+            case t: Type if collTypes contains tpeClassNm(t) =>
               val formatCollection = "formatCollection"
               q"""
-                ${formatCollectionQuote(t.typeArgs.head)(typeName(t))(formatCollection)}
+                ${formatCollectionQuote(t.typeArgs.head)(tpeClassNm(t))(formatCollection)}
                 ${TermName(formatCollection)}(${TermName(objNm)})
               """
-            case t: Type if typeName(t) == typeName(typeOf[Map[_, _]]) =>
+            case t: Type if tpeClassNm(typeOf[Map[_, _]]) == tpeClassNm(t) =>
               val formatMap = "formatMap"
               val List(key, value) = t.typeArgs
               q"""
