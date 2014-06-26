@@ -20,6 +20,8 @@ object MaterializersImpl {
 
     lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
 
+    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map typeName
+
     // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
     def createItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
@@ -29,13 +31,23 @@ object MaterializersImpl {
 
     def parseCollectionQuote(tpe: c.universe.Type)(collType: String)(methodNm: String) = {
       val createMeth = createItemMeth(tpe.toString)
+      val mapQuote =
+        q"""
+          (0 until arraySize).map {
+            idx => ${TermName(createMeth)}(${TermName(jreader)}.readArrayElem(array, idx))
+          }
+        """
+      val toCollQuote =
+        if (collType == typeName(typeOf[Seq[_]])) mapQuote
+        else q"""
+          ${mapQuote}.${TermName("to" + collType)}
+        """
+
       q"""
         def ${TermName(methodNm)}(array: J) = {
           ${createItemQuote(tpe)(createMeth)}
           val arraySize = ${TermName(jreader)}.readArrayLength(array)
-          (0 until arraySize).to[${TypeName(collType)}].map {
-            idx => ${TermName(createMeth)}(${TermName(jreader)}.readArrayElem(array, idx))
-          }
+          $toCollQuote
         }
       """
     }
@@ -99,7 +111,7 @@ object MaterializersImpl {
             case t: Type if numTypes contains t => readDoubleQuote(t)(jsonVarNm)(fieldNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jreader)}.readBoolean(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jreader)}.readString(${readJsonFieldQuote(jsonVarNm)(fieldNm)})"
-            case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
+            case t: Type if collTypes contains typeName(t) =>
               val parseCollection = "parseCollection"
               q"""
                 ${parseCollectionQuote(t.typeArgs.head)(typeName(t))(parseCollection)}
@@ -141,6 +153,8 @@ object MaterializersImpl {
     lazy val numTypes = List(typeOf[Double], typeOf[Float], typeOf[Short], typeOf[Int], typeOf[Long])
 
     lazy val typeName: Type => String = _.typeSymbol.asClass.name.toString
+
+    lazy val collTypes = List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map typeName
 
     def formatItemQuote(tpe: c.universe.Type)(method: String) =
       q"""
@@ -215,7 +229,7 @@ object MaterializersImpl {
             case t: Type if numTypes contains t => formatDoubleQuote(t)(objNm)
             case t: Type if t == typeOf[Boolean] => q"${TermName(jbuilder)}.makeBoolean(${TermName(objNm)})"
             case t: Type if t == typeOf[String] => q"${TermName(jbuilder)}.makeString(${TermName(objNm)})"
-            case t: Type if typeName(t) == typeName(typeOf[List[_]]) =>
+            case t: Type if collTypes contains typeName(t) =>
               val formatCollection = "formatCollection"
               q"""
                 ${formatCollectionQuote(t.typeArgs.head)(typeName(t))(formatCollection)}
