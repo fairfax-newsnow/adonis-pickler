@@ -2,16 +2,12 @@ package au.com.fairfax.adonis.apws.macros
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
-import au.com.fairfax.adonis.utils.json._
+import au.com.fairfax.adonis.apws.macros.json._
+import au.com.fairfax.adonis.utils.removePkgName
 
 object MaterializersImpl {
   def simplifiedMeth(action: String)(inStr: String): String =
-    List(action, inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map {
-      s =>
-        val idx = s.lastIndexOf(".")
-        if (idx < 0) s
-        else s.substring(idx + 1, s.length)
-    }.mkString("_")
+    List(action, inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
 
   def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
@@ -123,7 +119,7 @@ object MaterializersImpl {
     val tpe = weakTypeOf[T]
     val result =
       q"""
-          object GenJsonParser extends au.com.fairfax.adonis.utils.json.JsonParser[$tpe] {
+          object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParser[$tpe] {
             import org.scalajs.spickling._
             override def parse[J](json: J)(implicit ${TermName(jreader)}: PReader[J]) = {
               ${recurParseQuote(tpe)("json")("args")}
@@ -239,12 +235,13 @@ object MaterializersImpl {
     val tpe = weakTypeOf[T]
     val result =
       q"""
-          object GenJsonFormatter extends au.com.fairfax.adonis.utils.json.JsonFormatter[$tpe] {
+          object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatter[$tpe] {
             import org.scalajs.spickling._
-            override def format[J](obj: $tpe)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
+            override def format[J](obj: Any)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
+              val typedObj = obj.asInstanceOf[$tpe]
               ${TermName(jbuilder)}.makeObject(
                 "cmd" -> ${TermName(jbuilder)}.makeString(${tpe.toString}),
-                "args" -> ${recurFormatQuote(tpe)("obj")}
+                "args" -> ${recurFormatQuote(tpe)(s"typedObj")}
               )
             }
           }
@@ -255,8 +252,8 @@ object MaterializersImpl {
   }
 }
 
-object JsonMaterializerMacro {
-  def jsonParserMacro[T]: JsonParser[T] = macro MaterializersImpl.materializeParser[T]
+trait JsonMaterializers {
+  implicit def jsonParserMacro[T]: JsonParser[T] = macro MaterializersImpl.materializeParser[T]
 
-  def jsonFormatterMacro[T]: JsonFormatter[T] = macro MaterializersImpl.materializeFormatter[T]
+  implicit def jsonFormatterMacro[T]: JsonFormatter[T] = macro MaterializersImpl.materializeFormatter[T]
 }
