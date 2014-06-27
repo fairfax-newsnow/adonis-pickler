@@ -34,6 +34,16 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
+  def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (String, String, List[c.universe.Tree]) => c.universe.Tree) = {
+    import c.universe._
+    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => itemMeth(t.toString))
+    val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
+      if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
+      else Nil
+    }
+    quoteFunc(keyMeth,valMeth, itemQuotes)
+  }
+
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
 
   def doubleValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
@@ -44,7 +54,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes:List[c.universe.Tree]): c.universe.Tree
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._

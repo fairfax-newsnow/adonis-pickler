@@ -18,40 +18,38 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
-    val List(createKeyMeth, createValMeth) = List(keyTpe, valTpe) map (t => itemMeth(t.toString))
-    var createQuote = List(itemQuote(c)(keyTpe)(createKeyMeth))
-    if (keyTpe != valTpe)
-      createQuote = itemQuote(c)(valTpe)(createValMeth) :: createQuote
-    q"""
-        def ${TermName(methodNm)}(map: J) = {
-          ..$createQuote
-          val mapSize = ${TermName(jsonIO)}.readArrayLength(map)
-          (0 until mapSize).toList.map { idx =>
-            val tuple = ${TermName(jsonIO)}.readArrayElem(map, idx)
-            val key = ${TermName(jsonIO)}.readArrayElem(tuple, 0)
-            val value = ${TermName(jsonIO)}.readArrayElem(tuple, 1)
-            ${TermName(createKeyMeth)}(key) -> ${TermName(createValMeth)}(value)
-          }.toMap
-        }
-      """
+    mapTemplateQuote(c)(keyTpe)(valTpe) {
+      (keyMeth, valMeth, itemQuotes) =>
+        q"""
+          def ${TermName(methodNm)}(map: J) = {
+            ..$itemQuotes
+            val mapSize = ${TermName(jsonIO)}.readArrayLength(map)
+            (0 until mapSize).toList.map { idx =>
+              val tuple = ${TermName(jsonIO)}.readArrayElem(map, idx)
+              val key = ${TermName(jsonIO)}.readArrayElem(tuple, 0)
+              val value = ${TermName(jsonIO)}.readArrayElem(tuple, 1)
+              ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
+            }.toMap
+          }
+       """
+    }
   }
-
 
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {
     import c.universe._
     val createMeth = itemMeth(tpe.toString)
-    val mapQuote =
+    val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
             idx => ${TermName(createMeth)}(${TermName(jsonIO)}.readArrayElem(array, idx))
           }
         """
     val toCollQuote =
-      if (collType == tpeClassNm(c)(typeOf[Seq[_]])) mapQuote
+      if (collType == tpeClassNm(c)(typeOf[Seq[_]]))
+        intsToItemsQuote
       else q"""
-          ${mapQuote}.${TermName("to" + collType)}
-        """
-
+            ${intsToItemsQuote}.${TermName("to" + collType)}
+           """
     q"""
         def ${TermName(methodNm)}(array: J) = {
           ${itemQuote(c)(tpe)(createMeth)}
@@ -81,7 +79,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
     recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes:List[c.universe.Tree]): c.universe.Tree = {
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     q"""
         val ${TermName(objNm + "_" + fieldNm)} = ${fieldQuote(c)(objNm)(fieldNm)}

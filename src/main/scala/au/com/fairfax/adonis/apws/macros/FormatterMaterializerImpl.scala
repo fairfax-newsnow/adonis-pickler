@@ -17,21 +17,20 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
-    val List(formatKeyMeth, formatValMeth) = List(keyTpe, valTpe) map (t => itemMeth(t.toString))
-    var formatQuote = List(itemQuote(c)(keyTpe)(formatKeyMeth))
-    if (keyTpe != valTpe)
-      formatQuote = itemQuote(c)(valTpe)(formatValMeth) :: formatQuote
-    q"""
+    mapTemplateQuote(c)(keyTpe)(valTpe) {
+      (keyMeth, valMeth, itemQuotes) =>
+        q"""
         def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
-          ..$formatQuote
+          ..$itemQuotes
           val elems =
             map.map { t =>
               val (k, v) = t
-              ${TermName(jsonIO)}.makeArray(${TermName(formatKeyMeth)}(k), ${TermName(formatValMeth)}(v))
+              ${TermName(jsonIO)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
             }.toList
           ${TermName(jsonIO)}.makeArray(elems: _*)
         }
       """
+    }
   }
 
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {
