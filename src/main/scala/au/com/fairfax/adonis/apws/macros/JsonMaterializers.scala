@@ -63,7 +63,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
     }).toList
 
-    println(s"recurQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}, accessors = $accessors")
+//    println(s"recurQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}, accessors = $accessors")
     tpe match {
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
         doubleValQuote(c)(t)(objNm)(fieldNm)
