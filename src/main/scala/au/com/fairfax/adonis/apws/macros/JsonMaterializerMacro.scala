@@ -113,16 +113,16 @@ object MaterializersImpl {
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
         val parseCollection = "parseCollection"
         q"""
-                ${parseCollectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(parseCollection)}
-                ${TermName(parseCollection)}(${readJsonFieldQuote(c)(jsonVarNm)(fieldNm)})
-              """
+            ${parseCollectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(parseCollection)}
+            ${TermName(parseCollection)}(${readJsonFieldQuote(c)(jsonVarNm)(fieldNm)})
+        """
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val parseMap = "parseMap"
         val List(key, value) = t.typeArgs
         q"""
-                ${parseMapQuote(c)(key)(value)(parseMap)}
-                ${TermName(parseMap)}(${readJsonFieldQuote(c)(jsonVarNm)(fieldNm)})
-              """
+            ${parseMapQuote(c)(key)(value)(parseMap)}
+            ${TermName(parseMap)}(${readJsonFieldQuote(c)(jsonVarNm)(fieldNm)})
+        """
       case _ => accessors match {
         case x :: _ =>
           val newJsValueVar = s"${jsonVarNm}_$fieldNm"
