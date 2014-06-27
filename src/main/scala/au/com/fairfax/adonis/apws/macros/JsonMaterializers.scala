@@ -3,7 +3,7 @@ package au.com.fairfax.adonis.apws.macros
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
 import au.com.fairfax.adonis.utils._
-import au.com.fairfax.adonis.apws.macros.json.{JsonParser, FormatterParser}
+import au.com.fairfax.adonis.apws.macros.json._
 import scala.language.higherKinds
 
 object Materializer {
@@ -11,7 +11,7 @@ object Materializer {
     List("handle", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
 }
 
-trait Materializer {
+trait Materializer[FP[_] <: FormatterParser[_]] {
 
   import Materializer._
 
@@ -42,7 +42,7 @@ trait Materializer {
     ???
   }
 
-  def materialize[T: c.WeakTypeTag, FP[_] <: FormatterParser[_]](c: Context): c.Expr[FP[T]] = {
+  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[FP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
     val result = ???
@@ -51,8 +51,8 @@ trait Materializer {
 }
 
 
-//trait JsonMaterializers {
-//  implicit def jsonParserMacro[T]: JsonParser[T] = macro ParserMaterializerImpl.materialize[T, JsonParser]
+trait JsonMaterializersRefactored {
+  implicit def jsonParserMacro[T]: JsonParserRefactored[T] = macro ParserMaterializerImpl.materialize[T]
 
 //  implicit def jsonFormatterMacro[T]: JsonFormatter[T] = macro MaterializersImpl.materializeFormatter[T]
-//}
+}
