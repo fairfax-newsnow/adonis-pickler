@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox._
 import au.com.fairfax.adonis.apws.macros.json._
 import au.com.fairfax.adonis.utils.removePkgName
 
+// TODO this whole file is for backup pupose and should be removed
 object MaterializersImpl {
   def simplifiedMeth(action: String)(inStr: String): String =
     List(action, inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
