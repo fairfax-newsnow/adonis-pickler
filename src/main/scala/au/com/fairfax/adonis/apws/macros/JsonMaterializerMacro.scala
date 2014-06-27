@@ -140,12 +140,12 @@ object MaterializersImpl {
     }
   }
 
-  def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
+  def materializeParser[T: c.WeakTypeTag](c: Context): c.Expr[JsonParserBACKUP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
     val result =
       q"""
-          object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParser[$tpe] {
+          object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParserBACKUP[$tpe] {
             import org.scalajs.spickling._
             override def parse[J](json: J)(implicit ${TermName(jreader)}: PReader[J]) = {
               ${recurParseQuote(c)(tpe)("json")("args")}
@@ -154,7 +154,7 @@ object MaterializersImpl {
           GenJsonParser
       """
     println(result)
-    c.Expr[JsonParser[T]](result)
+    c.Expr[JsonParserBACKUP[T]](result)
   }
 
 
@@ -252,12 +252,12 @@ object MaterializersImpl {
     }
   }
 
-  def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
+  def materializeFormatter[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatterBACKUP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
     val result =
       q"""
-          object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatter[$tpe] {
+          object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatterBACKUP[$tpe] {
             import org.scalajs.spickling._
             override def format[J](obj: Any)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
@@ -270,12 +270,12 @@ object MaterializersImpl {
           GenJsonFormatter
       """
     println(result)
-    c.Expr[JsonFormatter[T]](result)
+    c.Expr[JsonFormatterBACKUP[T]](result)
   }
 }
 
-trait JsonMaterializers {
-  implicit def jsonParserMacro[T]: JsonParser[T] = macro MaterializersImpl.materializeParser[T]
+trait JsonMaterializersBACKUP {
+  implicit def jsonParserMacro[T]: JsonParserBACKUP[T] = macro MaterializersImpl.materializeParser[T]
 
-  implicit def jsonFormatterMacro[T]: JsonFormatter[T] = macro MaterializersImpl.materializeFormatter[T]
+  implicit def jsonFormatterMacro[T]: JsonFormatterBACKUP[T] = macro MaterializersImpl.materializeFormatter[T]
 }

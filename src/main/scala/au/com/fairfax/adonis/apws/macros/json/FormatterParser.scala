@@ -5,27 +5,28 @@ import au.com.fairfax.adonis.apws.macros._
 
 trait FormatterParser[T]
 
-trait JsonParserRefactored[T] extends FormatterParser[T] {
+trait JsonParser[T] extends FormatterParser[T] {
   def parse[J](json: J)(implicit reader: PReader[J]): T
 }
 
-object JsonParserRefactored extends JsonMaterializersRefactored
+object JsonParser extends ParserMaterializer
 
-trait JsonFormatterRefactored[T] extends FormatterParser[T] {
+trait JsonFormatter[T] extends FormatterParser[T] {
   def format[J](obj: Any)(implicit builder: PBuilder[J]): J
 }
 
-object JsonFormatterRefactored extends JsonMaterializersRefactored
+object JsonFormatter extends FormatterMaterializer
 
 
-trait JsonParser[T] {
+//BACKUP classes
+trait JsonParserBACKUP[T] {
   def parse[J](json: J)(implicit reader: PReader[J]): T
 }
 
-object JsonParser extends JsonMaterializers
+object JsonParserBACKUP extends JsonMaterializersBACKUP
 
-trait JsonFormatter[T] {
+trait JsonFormatterBACKUP[T] {
   def format[J](obj: Any)(implicit builder: PBuilder[J]): J
 }
 
-object JsonFormatter extends JsonMaterializers
+object JsonFormatterBACKUP extends JsonMaterializersBACKUP
