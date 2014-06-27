@@ -83,8 +83,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       tpe =>
         q"""
           object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatter[$tpe] {
-            import org.scalajs.spickling._
-            override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: PBuilder[J]) = {
+            override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.utils.json.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
               ${TermName(jsonIO)}.makeObject(
                 "cmd" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),

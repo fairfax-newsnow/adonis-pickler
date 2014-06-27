@@ -146,8 +146,7 @@ object MaterializersImpl {
     val result =
       q"""
           object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParserBACKUP[$tpe] {
-            import org.scalajs.spickling._
-            override def parse[J](json: J)(implicit ${TermName(jreader)}: PReader[J]) = {
+            override def parse[J](json: J)(implicit ${TermName(jreader)}: au.com.fairfax.adonis.utils.json.JReader[J]) = {
               ${recurParseQuote(c)(tpe)("json")("args")}
             }
           }
@@ -258,8 +257,7 @@ object MaterializersImpl {
     val result =
       q"""
           object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatterBACKUP[$tpe] {
-            import org.scalajs.spickling._
-            override def format[J](obj: Any)(implicit ${TermName(jbuilder)}: PBuilder[J]) = {
+            override def format[J](obj: Any)(implicit ${TermName(jbuilder)}: au.com.fairfax.adonis.utils.json.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
               ${TermName(jbuilder)}.makeObject(
                 "cmd" -> ${TermName(jbuilder)}.makeString(${tpe.toString}),

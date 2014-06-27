@@ -93,8 +93,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       tpe =>
         q"""
           object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParser[$tpe] {
-            import org.scalajs.spickling._
-            override def parse[J](json: J)(implicit ${TermName(jsonIO)}: PReader[J]) = {
+            override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.utils.json.JReader[J]) = {
               ${recurQuote(c)(tpe)("json")("args")}
             }
           }
