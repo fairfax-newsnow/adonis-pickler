@@ -42,11 +42,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     ???
   }
 
-  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[FP[T]] = {
+  def materializeTemplate[T: c.WeakTypeTag](c: Context)(quoteFunc: c.universe.Type => c.universe.Tree): c.Expr[FP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val result = ???
-    ???
+    val result = quoteFunc(tpe)
+    println(result)
+    c.Expr[FP[T]](result)
   }
 }
 
