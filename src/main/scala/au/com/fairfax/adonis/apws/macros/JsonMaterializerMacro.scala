@@ -32,7 +32,7 @@ object MaterializersImpl {
   def parseItemQuote(c: Context)(tpe: c.universe.Type)(method: String) = {
     import c.universe._
     q"""
-        def ${TermName(method)}(item: J) =
+        def ${TermName(method)}(item: ${TypeName("J")}) =
           ${recurParseQuote(c)(tpe)("item")("")}
       """
   }
