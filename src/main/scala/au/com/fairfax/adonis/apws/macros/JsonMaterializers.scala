@@ -56,6 +56,53 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String): (Set[c.universe.Tree], c.universe.Tree) = {
+    import c.universe._
+
+    val sealedTraitSym = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol]
+    println(s"sealedTraitSym's descendants = ${sealedTraitSym.sealedDescendants.map(_.asInstanceOf[Symbol])}")
+    val childTypeSyms = sealedTraitSym.sealedDescendants.filterNot {
+      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+    }.map(_.asInstanceOf[Symbol].asType)
+
+    val childTypes = childTypeSyms map (_.toType)
+
+    val itemQuotes = childTypeSyms.map {
+      cts => itemQuote(c)(cts.toType)(itemMeth(cts.asClass.name.toString))
+    }
+    //        println(s"itemQuotes = $itemQuotes")
+
+    val caseQuotes = childTypeSyms.map {
+      cts =>
+        val pattern = removePkgName(cts.asClass.name.toString)
+        val patternHandler =
+          if (cts.companion == NoSymbol)
+            q"${TermName(itemMeth(pattern))}"
+          else q"""
+                   ${TermName(itemMeth(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
+                 """
+        cq"""$pattern => $patternHandler"""
+    }
+    //        println(s"caseQuotes = $caseQuotes")
+
+    val matchQuote =
+      if (childTypes forall (_.companion == NoSymbol))
+        q"""
+              ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+                case ..$caseQuotes
+              }
+            """
+      else
+        q"""
+              ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+                case ..$caseQuotes
+              }
+            """
+    //        println(s"matchQuote = $matchQuote")
+
+    (itemQuotes, matchQuote)
+  }
+
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
@@ -89,48 +136,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         """
 
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val childTypeSyms = t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-          des => des.isSealed || tpeClassNm(c)(t) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-        }.map(_.asInstanceOf[Symbol].asType)
-        val childTypes = childTypeSyms map (_.toType)
-
-        val itemQuotes = childTypeSyms.map {
-          cts => itemQuote(c)(cts.toType)(itemMeth(cts.asClass.name.toString))
-        }
-//        println(s"itemQuotes = $itemQuotes")
-
-        val caseQuotes = childTypeSyms.map {
-          cts =>
-            val pattern = removePkgName(cts.asClass.name.toString)
-            val patternHandler =
-              if (cts.companion == NoSymbol)
-                q"${TermName(itemMeth(pattern))}"
-              else q"""
-                   ${TermName(itemMeth(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
-                 """
-            cq"""$pattern => $patternHandler"""
-        }
-        println(s"caseQuotes = $caseQuotes")
-
-        val matchQuote =
-          if (childTypes forall (_.companion == NoSymbol))
-            q"""
-              ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-                case ..$caseQuotes
-              }
-            """
-          else
-            q"""
-              ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-                case ..$caseQuotes
-              }
-            """
-
-//        println(s"matchQuote = $matchQuote")
-
+        val (itemQuotes, matchQuote) = sealedTraitQuote(c)(t)("item")
+        val handleSealedTrait = itemMeth(t.toString)
         q"""
-          ..$itemQuotes
-          $matchQuote
+          def ${TermName(handleSealedTrait)}(item: ${TypeName("J")}) = {
+            ..$itemQuotes
+            $matchQuote
+          }
+          ${TermName(handleSealedTrait)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       case _ => accessors match {

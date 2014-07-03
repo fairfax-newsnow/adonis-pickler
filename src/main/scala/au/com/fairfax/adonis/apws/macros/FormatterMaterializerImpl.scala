@@ -7,10 +7,10 @@ import Materializer._
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   val jsonIO: String = "builder"
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(method: String): c.universe.Tree = {
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(method)}(obj: $tpe) =
+      def ${TermName(methodNm)}(obj: $tpe) =
         ${recurQuote(c)(tpe)("obj")("")}
     """
   }

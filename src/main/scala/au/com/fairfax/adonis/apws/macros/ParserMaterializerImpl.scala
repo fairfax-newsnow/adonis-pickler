@@ -3,15 +3,16 @@ package au.com.fairfax.adonis.apws.macros
 import scala.reflect.macros.blackbox.Context
 import au.com.fairfax.adonis.apws.macros.json._
 import Materializer._
+import au.com.fairfax.adonis.utils._
 
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   val jsonIO: String = "reader"
 
   // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
-  def itemQuote(c: Context)(tpe: c.universe.Type)(method: String): c.universe.Tree = {
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
     q"""
-        def ${TermName(method)}(item: ${TypeName("J")}) =
+        def ${TermName(methodNm)}(item: ${TypeName("J")}) =
           ${recurQuote(c)(tpe)("item")("")}
       """
   }
