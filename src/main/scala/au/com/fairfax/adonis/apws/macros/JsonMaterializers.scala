@@ -74,51 +74,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String): (Set[c.universe.Tree], c.universe.Tree) = {
-    import c.universe._
-
-    val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType)
-
-    println(s"sealedTraitQuote, childTypeSyms.size = ${childTypeSyms.size}")
-
-    val itemQuotes = childTypeSyms.map {
-      cts =>
-        val classNm = cts.asClass.name.toString
-        if (hasNoAccessor(c)(cts.toType)) objectQuote(c)(cts.toType)(itemMethNm(classNm))
-        else itemQuote(c)(cts.toType)(itemMethNm(classNm))
-    }
-
-    val caseQuotes = childTypeSyms.map {
-      cts =>
-        val pattern = removePkgName(cts.asClass.name.toString)
-        val patternHandler =
-          if (hasNoAccessor(c)(cts.toType))
-            q"${TermName(itemMethNm(pattern))}"
-          else
-            q"""
-              ${TermName(itemMethNm(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
-            """
-        cq"""$pattern => $patternHandler"""
-    }
-
-    val matchQuote =
-      if (childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType)))
-        q"""
-          ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-            case ..$caseQuotes
-          }
-        """
-      else
-        q"""
-          ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-            case ..$caseQuotes
-          }
-        """
-
-    (itemQuotes, matchQuote)
-  }
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String): c.universe.Tree
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
@@ -154,14 +110,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val (itemQuotes, matchQuote) = sealedTraitQuote(c)(t)("item")
-        val handleSealedTrait = itemMethNm(t.toString + "_family")
+        val traitFamilyMeth = itemMethNm(t.toString + "_family")
         q"""
-          def ${TermName(handleSealedTrait)}(item: ${TypeName("J")}) = {
-            ..$itemQuotes
-            $matchQuote
-          }
-          ${TermName(handleSealedTrait)}(${fieldQuote(c)(objNm)(fieldNm)})
+          ${sealedTraitQuote(c)(t)(objNm)(traitFamilyMeth)}
+          ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // a structured type

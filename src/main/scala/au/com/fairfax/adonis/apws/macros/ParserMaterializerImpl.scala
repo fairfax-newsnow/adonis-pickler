@@ -80,6 +80,57 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
     recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)
 
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String): c.universe.Tree = {
+    import c.universe._
+
+    val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+    }.map(_.asInstanceOf[Symbol].asType)
+
+    println(s"sealedTraitQuote, childTypeSyms.size = ${childTypeSyms.size}")
+
+    val itemQuotes = childTypeSyms.map {
+      cts =>
+        val classNm = cts.asClass.name.toString
+        if (hasNoAccessor(c)(cts.toType)) objectQuote(c)(cts.toType)(itemMethNm(classNm))
+        else itemQuote(c)(cts.toType)(itemMethNm(classNm))
+    }
+
+    val caseQuotes = childTypeSyms.map {
+      cts =>
+        val pattern = removePkgName(cts.asClass.name.toString)
+        val patternHandler =
+          if (hasNoAccessor(c)(cts.toType))
+            q"${TermName(itemMethNm(pattern))}"
+          else
+            q"""
+              ${TermName(itemMethNm(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
+            """
+        cq"""$pattern => $patternHandler"""
+    }
+
+    val matchQuote =
+      if (childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType)))
+        q"""
+          ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+            case ..$caseQuotes
+          }
+        """
+      else
+        q"""
+          ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+            case ..$caseQuotes
+          }
+        """
+
+    q"""
+      def ${TermName(methodNm)}(${TermName(objNm)}: ${TypeName("J")}) = {
+        ..$itemQuotes
+        $matchQuote
+      }
+    """
+  }
+
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     q"""

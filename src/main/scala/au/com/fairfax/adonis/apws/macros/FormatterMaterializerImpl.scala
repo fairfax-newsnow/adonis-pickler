@@ -70,6 +70,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String): c.universe.Tree =
+    ???
+
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     q"""
