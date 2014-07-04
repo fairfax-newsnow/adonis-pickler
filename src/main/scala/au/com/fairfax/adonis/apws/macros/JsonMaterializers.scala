@@ -30,7 +30,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def numDealisTpeNms(c: Context) =
     List(deliasTpeName[Double](c), deliasTpeName[Float](c), deliasTpeName[Short](c), deliasTpeName[Int](c), deliasTpeName[Long](c))
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(method: String): c.universe.Tree
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
+
+  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+    import c.universe._
+    q"def ${TermName(methodNm)} = new $tpe"
+  }
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
@@ -68,9 +73,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     val childTypes = childTypeSyms map (_.toType)
 
     val itemQuotes = childTypeSyms.map {
-      cts => itemQuote(c)(cts.toType)(itemMeth(cts.asClass.name.toString))
+      cts =>
+        val itemMethoName = itemMeth(cts.asClass.name.toString)
+        if (cts.companion == NoSymbol) objectQuote(c)(cts.toType)(itemMethoName)
+        else itemQuote(c)(cts.toType)(itemMethoName)
     }
-    //        println(s"itemQuotes = $itemQuotes")
 
     val caseQuotes = childTypeSyms.map {
       cts =>
@@ -78,15 +85,15 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val patternHandler =
           if (cts.companion == NoSymbol)
             q"${TermName(itemMeth(pattern))}"
-          else q"""
-                   ${TermName(itemMeth(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
-                 """
+          else
+            q"""
+              ${TermName(itemMeth(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
+            """
         cq"""$pattern => $patternHandler"""
     }
-    //        println(s"caseQuotes = $caseQuotes")
 
     val matchQuote =
-      if (childTypes forall (_.companion == NoSymbol))
+      if (childTypes forall (_.companion == NoType))
         q"""
               ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
                 case ..$caseQuotes
@@ -98,7 +105,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 case ..$caseQuotes
               }
             """
-    //        println(s"matchQuote = $matchQuote")
 
     (itemQuotes, matchQuote)
   }
@@ -106,7 +112,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}")
+    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
 
     val accessors = (tpe.decls collect {
       case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
@@ -114,12 +120,15 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
     //    println(s"recurQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}, accessors = $accessors")
     tpe match {
+      // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
         doubleValQuote(c)(t)(objNm)(fieldNm)
 
+      // boolean or string type
       case t: Type if List(deliasTpeName[Boolean](c), deliasTpeName[String](c)) contains t.dealias.toString =>
         q"${TermName(jsonIO)}.${TermName(ioActionString + t.dealias.toString)}(${fieldQuote(c)(objNm)(fieldNm)})"
 
+      // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
         val handleCollection = "handleCollection"
         q"""
@@ -127,6 +136,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
             ${TermName(handleCollection)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
+      // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val handleMap = "handleMap"
         val List(key, value) = t.typeArgs
@@ -135,6 +145,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
             ${TermName(handleMap)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
+      // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         val (itemQuotes, matchQuote) = sealedTraitQuote(c)(t)("item")
         val handleSealedTrait = itemMeth(t.toString)
@@ -146,6 +157,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
           ${TermName(handleSealedTrait)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
+      //      // a object
+      //      case t: Type if t.companion == NoType =>
+      //        val typeName = t.toString
+      //        val objType = typeName.substring(0, typeName.length - ".type".length)
+      //        q"${TermName(objType)}"
+
+      // a structured type
       case _ => accessors match {
         case x :: _ =>
           val accessorQuotes = accessors map {
