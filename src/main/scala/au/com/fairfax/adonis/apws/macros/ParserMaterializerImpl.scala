@@ -11,17 +11,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
-    // if this is a singleton object
-    if (tpe.companion == NoType)
-      q"""
-        def ${TermName(methodNm)} =
-          ${recurQuote(c)(tpe)("")("")}
-      """
-    else
-      q"""
-        def ${TermName(methodNm)}(item: ${TypeName("J")}) =
-          ${recurQuote(c)(tpe)("item")("")}
-      """
+    q"""
+      def ${TermName(methodNm)}(item: ${TypeName("J")}) =
+        ${recurQuote(c)(tpe)("item")("")}
+    """
   }
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree = {

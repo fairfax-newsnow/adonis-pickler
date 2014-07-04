@@ -32,10 +32,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
-  //  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
-  //    import c.universe._
-  //    q"def ${TermName(methodNm)} = new $tpe"
-  //  }
+  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+    import c.universe._
+    q"""
+      def ${TermName(methodNm)} =
+        new $tpe
+    """
+  }
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
@@ -61,6 +64,16 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
+  def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
+    import c.universe._
+    tpe.decls.collect {
+      case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
+    }.toList
+  }
+
+  def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
+    getAccessors(c)(tpe).isEmpty
+
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String): (Set[c.universe.Tree], c.universe.Tree) = {
     import c.universe._
 
@@ -68,15 +81,20 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType)
 
+    println(s"sealedTraitQuote, childTypeSyms.size = ${childTypeSyms.size}")
+
     val itemQuotes = childTypeSyms.map {
-      cts => itemQuote(c)(cts.toType)(itemMethNm(cts.asClass.name.toString))
+      cts =>
+        val classNm = cts.asClass.name.toString
+        if (hasNoAccessor(c)(cts.toType)) objectQuote(c)(cts.toType)(itemMethNm(classNm))
+        else itemQuote(c)(cts.toType)(itemMethNm(classNm))
     }
 
     val caseQuotes = childTypeSyms.map {
       cts =>
         val pattern = removePkgName(cts.asClass.name.toString)
         val patternHandler =
-          if (cts.companion == NoSymbol)
+          if (hasNoAccessor(c)(cts.toType))
             q"${TermName(itemMethNm(pattern))}"
           else
             q"""
@@ -86,18 +104,18 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     }
 
     val matchQuote =
-      if (childTypeSyms forall (_.companion == NoSymbol))
+      if (childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType)))
         q"""
-              ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-                case ..$caseQuotes
-              }
-            """
+          ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+            case ..$caseQuotes
+          }
+        """
       else
         q"""
-              ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-                case ..$caseQuotes
-              }
-            """
+          ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+            case ..$caseQuotes
+          }
+        """
 
     (itemQuotes, matchQuote)
   }
@@ -106,10 +124,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     import c.universe._
 
     println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
-
-    val accessors = (tpe.decls collect {
-      case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
-    }).toList
 
     //    println(s"recurQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}, accessors = $accessors")
     tpe match {
@@ -150,27 +164,27 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
           ${TermName(handleSealedTrait)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
-      // a singleton object
-      case t: Type if t.companion == NoType =>
-        q"new $t"
-
       // a structured type
-      case _ => accessors match {
-        case x :: _ =>
-          val accessorQuotes = accessors map {
-            accessor =>
-              val accessorField = accessor.name.toString
-              val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
-              eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
-          }
-          structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
-      }
+      case _ =>
+        val accessors = getAccessors(c)(tpe)
+        accessors match {
+          case x :: _ =>
+            val accessorQuotes = accessors map {
+              accessor =>
+                val accessorField = accessor.name.toString
+                val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+                eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
+            }
+            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
+          case _ => q"new $tpe"
+        }
     }
   }
 
   def materializeTemplate[T: c.WeakTypeTag](c: Context)(quoteFunc: c.universe.Type => c.universe.Tree): c.Expr[FP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
+
     val result = quoteFunc(tpe)
     println(result)
     c.Expr[FP[T]](result)
