@@ -7,7 +7,7 @@ import au.com.fairfax.adonis.apws.macros.json._
 import scala.language.higherKinds
 
 object Materializer {
-  def itemMeth(inStr: String): String =
+  def itemMethNm(inStr: String): String =
     List("handle", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
 }
 
@@ -32,16 +32,16 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
-  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
-    import c.universe._
-    q"def ${TermName(methodNm)} = new $tpe"
-  }
+  //  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+  //    import c.universe._
+  //    q"def ${TermName(methodNm)} = new $tpe"
+  //  }
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
   def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (String, String, List[c.universe.Tree]) => c.universe.Tree) = {
     import c.universe._
-    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => itemMeth(t.toString))
+    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => itemMethNm(t.toString))
     val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
       if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
       else Nil
@@ -64,19 +64,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String): (Set[c.universe.Tree], c.universe.Tree) = {
     import c.universe._
 
-    val sealedTraitSym = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol]
-    println(s"sealedTraitSym's descendants = ${sealedTraitSym.sealedDescendants.map(_.asInstanceOf[Symbol])}")
-    val childTypeSyms = sealedTraitSym.sealedDescendants.filterNot {
+    val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType)
 
-    val childTypes = childTypeSyms map (_.toType)
-
     val itemQuotes = childTypeSyms.map {
-      cts =>
-        val itemMethoName = itemMeth(cts.asClass.name.toString)
-        if (cts.companion == NoSymbol) objectQuote(c)(cts.toType)(itemMethoName)
-        else itemQuote(c)(cts.toType)(itemMethoName)
+      cts => itemQuote(c)(cts.toType)(itemMethNm(cts.asClass.name.toString))
     }
 
     val caseQuotes = childTypeSyms.map {
@@ -84,16 +77,16 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val pattern = removePkgName(cts.asClass.name.toString)
         val patternHandler =
           if (cts.companion == NoSymbol)
-            q"${TermName(itemMeth(pattern))}"
+            q"${TermName(itemMethNm(pattern))}"
           else
             q"""
-              ${TermName(itemMeth(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
+              ${TermName(itemMethNm(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
             """
         cq"""$pattern => $patternHandler"""
     }
 
     val matchQuote =
-      if (childTypes forall (_.companion == NoType))
+      if (childTypeSyms forall (_.companion == NoSymbol))
         q"""
               ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
                 case ..$caseQuotes
@@ -148,7 +141,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         val (itemQuotes, matchQuote) = sealedTraitQuote(c)(t)("item")
-        val handleSealedTrait = itemMeth(t.toString)
+        val handleSealedTrait = itemMethNm(t.toString)
         q"""
           def ${TermName(handleSealedTrait)}(item: ${TypeName("J")}) = {
             ..$itemQuotes
@@ -157,11 +150,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
           ${TermName(handleSealedTrait)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
-      //      // a object
-      //      case t: Type if t.companion == NoType =>
-      //        val typeName = t.toString
-      //        val objType = typeName.substring(0, typeName.length - ".type".length)
-      //        q"${TermName(objType)}"
+      // a singleton object
+      case t: Type if t.companion == NoType =>
+        q"new $t"
 
       // a structured type
       case _ => accessors match {

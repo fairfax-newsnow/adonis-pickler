@@ -35,7 +35,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {
     import c.universe._
-    val formatMeth = itemMeth(tpe.toString)
+    val formatMeth = itemMethNm(tpe.toString)
     q"""
         def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
           ${itemQuote(c)(tpe)(formatMeth)}
