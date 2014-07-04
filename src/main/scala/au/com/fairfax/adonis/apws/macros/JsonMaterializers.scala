@@ -74,7 +74,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String): c.universe.Tree
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
@@ -110,11 +110,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val traitFamilyMeth = itemMethNm(t.toString + "_family")
-        q"""
-          ${sealedTraitQuote(c)(t)(objNm)(traitFamilyMeth)}
-          ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        sealedTraitQuote(c)(t)(objNm)(fieldNm)
 
       // a structured type
       case _ =>

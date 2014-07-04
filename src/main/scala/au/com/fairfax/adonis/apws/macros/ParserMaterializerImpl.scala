@@ -80,14 +80,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
     recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String): c.universe.Tree = {
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
     val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType)
-
-    println(s"sealedTraitQuote, childTypeSyms.size = ${childTypeSyms.size}")
 
     val itemQuotes = childTypeSyms.map {
       cts =>
@@ -123,11 +121,13 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           }
         """
 
+    val traitFamilyMeth = itemMethNm(tpe.toString + "_family")
     q"""
-      def ${TermName(methodNm)}(${TermName(objNm)}: ${TypeName("J")}) = {
+      def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: ${TypeName("J")}) = {
         ..$itemQuotes
         $matchQuote
       }
+      ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
