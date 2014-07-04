@@ -155,7 +155,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         val (itemQuotes, matchQuote) = sealedTraitQuote(c)(t)("item")
-        val handleSealedTrait = itemMethNm(t.toString)
+        val handleSealedTrait = itemMethNm(t.toString + "_family")
         q"""
           def ${TermName(handleSealedTrait)}(item: ${TypeName("J")}) = {
             ..$itemQuotes
