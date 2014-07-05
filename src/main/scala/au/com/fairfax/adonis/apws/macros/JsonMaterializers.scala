@@ -118,7 +118,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
             }
             structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
-          case _ => q"new $tpe" //TODO remove this case, it's handled by objectQuote
         }
     }
   }
