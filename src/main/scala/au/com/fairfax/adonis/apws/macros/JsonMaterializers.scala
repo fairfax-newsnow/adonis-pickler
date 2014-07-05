@@ -32,14 +32,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
-  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
-    import c.universe._
-    q"""
-      def ${TermName(methodNm)} =
-        new $tpe
-    """
-  }
-
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
   def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (String, String, List[c.universe.Tree]) => c.universe.Tree) = {
@@ -52,18 +44,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     quoteFunc(keyMeth, valMeth, itemQuotes)
   }
 
-  def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
-
-  def doubleValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
-
-  def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
-
-  def ioActionString: String
-
-  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
-
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
-
   def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
     import c.universe._
     tpe.decls.collect {
@@ -73,6 +53,20 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
+
+  def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
+
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def ioActionString: String
+
+  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
+
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
+
+  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
@@ -85,7 +79,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     tpe match {
       // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
-        doubleValQuote(c)(t)(objNm)(fieldNm)
+        numericValQuote(c)(t)(objNm)(fieldNm)
 
       // boolean or string type
       case t: Type if List(deliasTpeName[Boolean](c), deliasTpeName[String](c)) contains t.dealias.toString =>
@@ -124,7 +118,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
             }
             structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
-          case _ => q"new $tpe"
+          case _ => q"new $tpe" //TODO remove this case, it's handled by objectQuote
         }
     }
   }

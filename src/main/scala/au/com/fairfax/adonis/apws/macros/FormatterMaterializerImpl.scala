@@ -6,7 +6,9 @@ import Materializer._
 import au.com.fairfax.adonis.utils._
 
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
-  val jsonIO: String = "builder"
+  lazy val jsonIO: String = "builder"
+
+  lazy val ioActionString: String = "make"
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
@@ -48,7 +50,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       """
   }
 
-  def doubleValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val numQuote =
       if (tpe == typeOf[Double]) q"${TermName(objNm)}"
@@ -61,8 +63,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${TermName(objNm)}"
   }
 
-  def ioActionString: String = "make"
-
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree = {
     import c.universe._
     q"""
@@ -71,6 +71,28 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
+    import c.universe._
+    q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
+  }
+
+  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+    import c.universe._
+    val typeName = removePkgName(tpe.typeSymbol.asClass.name.toString)
+    val makeJQuote: String => c.universe.Tree = v => q"${TermName(jsonIO)}.makeString($v)"
+    val buildQuote =
+      if (areSiblingCaseObjs)
+        q"""${TermName(jsonIO)}.makeString($typeName)"""
+      else
+        q"""${TermName(jsonIO)}.makeObject("t" -> ${makeJQuote(typeName)}, "v" -> ${makeJQuote("")})"""
+    q"""
+      def ${TermName(methodNm)} =
+        $buildQuote
+    """
+  }
+
+  private lazy val varBeMatched = "obj"
+
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
@@ -78,54 +100,37 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType)
 
-    val itemQuotes = childTypeSyms.map {
-      cts =>
-        val classNm = cts.asClass.name.toString
-        if (hasNoAccessor(c)(cts.toType)) objectQuote(c)(cts.toType)(itemMethNm(classNm))
-        else itemQuote(c)(cts.toType)(itemMethNm(classNm))
-    }
+    val onlyCaseObjects = childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType))
 
-    val caseQuotes = childTypeSyms.map {
-      cts =>
-        val pattern = removePkgName(cts.asClass.name.toString)
-        val patternHandler =
-          if (hasNoAccessor(c)(cts.toType))
-            q"${TermName(itemMethNm(pattern))}"
-          else
-            q"""
-              ${TermName(itemMethNm(pattern))}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))
-            """
-        cq"""$pattern => $patternHandler"""
-    }
+    val (itemQuotes, caseQuotes) = {
+      childTypeSyms.map {
+        cts =>
+          val pattern = removePkgName(cts.asClass.name.toString)
+          val method = itemMethNm(pattern)
+          val (iQuote, caseHandler) =
+            if (hasNoAccessor(c)(cts.toType))
+              (objectQuote(c)(cts.toType)(method)(onlyCaseObjects), q"${TermName(method)}")
+            else
+              (itemQuote(c)(cts.toType)(method), q"""${TermName(method)}(${TermName(varBeMatched)})""")
+          (iQuote, cq"""${TermName(varBeMatched)} : ${cts.toType} => $caseHandler""")
+      }
+    }.unzip
 
     val matchQuote =
-      if (childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType)))
-        q"""
-          ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-            case ..$caseQuotes
-          }
-        """
-      else
-        q"""
-          ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-            case ..$caseQuotes
-          }
-        """
+      q"""
+           ${TermName(objNm)} match {
+             case ..$caseQuotes
+           }
+         """
 
     val traitFamilyMeth = itemMethNm(tpe.toString + "_family")
+    // TODO try to use another namei instead of objNm inside TermName(objNm)
     q"""
-      def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: ${TypeName("J")}) = {
+      def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: $tpe) = {
         ..$itemQuotes
         $matchQuote
       }
       ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-    """
-  }
-
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
-    import c.universe._
-    q"""
-      ${TermName(jsonIO)}.makeObject(..$accessorQuotes)
     """
   }
 
@@ -144,7 +149,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
             }
           }
           GenJsonFormatter
-      """
+        """
     }
   }
 }
