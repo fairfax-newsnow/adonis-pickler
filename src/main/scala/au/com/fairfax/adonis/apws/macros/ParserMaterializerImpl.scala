@@ -50,7 +50,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val toCollQuote =
       if (collType == tpeClassNm(c)(typeOf[Seq[_]]))
         intsToItemsQuote
-      else q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
+      else
+        q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
     q"""
         def ${TermName(methodNm)}(array: J) = {
           ${itemQuote(c)(tpe)(createMeth)}
@@ -63,8 +64,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val quote = q"${TermName(jsonIO)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
-    if (tpe == typeOf[Double]) quote
-    else q"${quote}.asInstanceOf[$tpe]"
+    if (tpe == typeOf[Double])
+      quote
+    else
+      q"${quote}.asInstanceOf[$tpe]"
   }
 
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
@@ -86,59 +89,43 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
-    q"""
-      def ${TermName(methodNm)} =
-        new $tpe
-    """
+    q"def ${TermName(methodNm)} = new $tpe"
   }
 
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-
-    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType.toType)
-
-    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
-
-    val (itemQuotes, caseQuotes) = {
-      childTypes.map {
-        ct =>
-          val pattern = removePkgName(tpeClassNm(c)(ct))
-          val method = itemMethNm(pattern)
-          val (iQuote, caseHandler) =
-            if (hasNoAccessor(c)(ct))
-              (objectQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
-            else
-              (itemQuote(c)(ct)(method), q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))""")
-          (iQuote, cq"""$pattern => $caseHandler""")
-      }
-    }.unzip
-
-    val matchQuote =
-      if (onlyCaseObjects)
+    val classItemQuote: (String, Type) => Tree =
+      (method, ct) => itemQuote(c)(ct)(method)
+    val classHandlerQuote: String => Tree =
+      method =>
+        q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))"""
+    val ptnToHandlerQuote: (Type, Tree, String) => Tree =
+      (ct, handlerQuote, pattern) => cq"""$pattern => $handlerQuote"""
+    val matchQuote: (Boolean, Set[Tree]) => Tree =
+      (onlyCaseObjects, ptnToHandlerQuotes) =>
+        if (onlyCaseObjects)
+          q"""
+            ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+              case ..$ptnToHandlerQuotes
+            }
+          """
+        else
+          q"""
+            ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+              case ..$ptnToHandlerQuotes
+            }
+          """
+    val traitMethodQuote: (String, Set[Tree], Tree) => Tree =
+      (method, itemQuotes, matchQuote) =>
         q"""
-          ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-            case ..$caseQuotes
+          def ${TermName(method)}(${TermName(objNm)}: ${TypeName("J")}) = {
+            ..$itemQuotes
+            $matchQuote
           }
         """
-      else
-        q"""
-          ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-            case ..$caseQuotes
-          }
-        """
-
-    val traitFamilyMeth = itemMethNm(tpe.toString + "_family")
-    q"""
-      def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: ${TypeName("J")}) = {
-        ..$itemQuotes
-        $matchQuote
-      }
-      ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-    """
+    sealedTraitQuoteTemplate(c)(tpe)(objNm)(fieldNm)(classItemQuote)(classHandlerQuote)(ptnToHandlerQuote)(matchQuote)(traitMethodQuote)
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {

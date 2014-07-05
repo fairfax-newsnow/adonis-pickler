@@ -87,12 +87,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
   }
 
-  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
     val typeName = removePkgName(tpeClassNm(c)(tpe))
     val buildQuote =
       if (areSiblingCaseObjs)
-        q"""${TermName(jsonIO)}.makeString($typeName)"""
+        q"${TermName(jsonIO)}.makeString($typeName)"
       else
         q"""${TermName(jsonIO)}.makeObject("t" -> ${toJsonStringQuote(c)(typeName)}, "v" -> ${toJsonStringQuote(c)("")})"""
     q"""
@@ -101,55 +101,39 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  private lazy val varBeMatched = "obj"
-
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-
-    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType.toType)
-
-    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
-
-    val (itemQuotes, caseQuotes) = {
-      childTypes.map {
-        ct =>
-          val pattern = removePkgName(tpeClassNm(c)(ct))
-          val method = itemMethNm(pattern)
-          val (iQuote, caseHandler) =
-            if (hasNoAccessor(c)(ct))
-              (objectQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
-            else
-              (itemQuoteTemplate(c)(ct)(method) {
-                varName =>
-                  val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
-                  val accessorQuotes =
-                    List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-                      q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
-                  structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
-              },
-                q"""${TermName(method)}(${TermName(varBeMatched)})""")
-          (iQuote, cq"""${TermName(varBeMatched)} : ${ct} => $caseHandler""")
-      }
-    }.unzip
-
-    val matchQuote =
-      q"""
-        ${TermName(objNm)} match {
-          case ..$caseQuotes
+    val classItemQuote: (String, Type) => Tree =
+      (method, ct) =>
+        itemQuoteTemplate(c)(ct)(method) {
+          varName =>
+            val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
+            val accessorQuotes =
+              List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
+                q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
+            structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
         }
-      """
-
-    val traitFamilyMeth = itemMethNm(tpe.toString + "_family")
-    // TODO try to use another name instead of objNm inside TermName(objNm)
-    q"""
-      def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: $tpe) = {
-        ..$itemQuotes
-        $matchQuote
-      }
-      ${TermName(traitFamilyMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-    """
+    val varBeMatched = "obj"
+    val classHandlerQuote: String => Tree =
+      method => q"${TermName(method)}(${TermName(varBeMatched)})"
+    val ptnToHandlerQuote: (Type, Tree, String) => Tree =
+      (ct, handlerQuote, _) => cq"${TermName(varBeMatched)} : ${ct} => $handlerQuote"
+    val matchQuote: (Boolean, Set[Tree]) => Tree =
+      (onlyCaseObjects, ptnToHandlerQuotes) =>
+        q"""
+          ${TermName(objNm)} match {
+            case ..$ptnToHandlerQuotes
+          }
+        """
+    val traitMethodQuote: (String, Set[Tree], Tree) => Tree =
+      (method, itemQuotes, matchQuote) =>
+        q"""
+          def ${TermName(method)}(${TermName(objNm)}: $tpe) = {
+            ..$itemQuotes
+            $matchQuote
+          }
+        """
+    sealedTraitQuoteTemplate(c)(tpe)(objNm)(fieldNm)(classItemQuote)(classHandlerQuote)(ptnToHandlerQuote)(matchQuote)(traitMethodQuote)
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {

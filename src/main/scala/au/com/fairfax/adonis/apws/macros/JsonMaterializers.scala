@@ -65,9 +65,44 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
+  def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def sealedTraitQuoteTemplate(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)
+                              (classItemQuote: (String, c.universe.Type) => c.universe.Tree)
+                              (classHandlerQuote: String => c.universe.Tree)
+                              (ptnToHandlerQuote: (c.universe.Type, c.universe.Tree, String) => c.universe.Tree)
+                              (matchQuote: (Boolean, Set[c.universe.Tree]) => c.universe.Tree)
+                              (traitMethodQuote: (String, Set[c.universe.Tree], c.universe.Tree)=> c.universe.Tree): c.universe.Tree = {
+    import c.universe._
+
+    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+    }.map(_.asInstanceOf[Symbol].asType.toType)
+
+    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
+
+    val (itemQuotes, ptnToHandlerQuotes) = {
+      childTypes.map {
+        ct =>
+          val pattern = removePkgName(tpeClassNm(c)(ct))
+          val method = itemMethNm(pattern)
+          val (iQuote, handlerQuote) =
+            if (hasNoAccessor(c)(ct))
+              (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
+            else
+              (classItemQuote(method, ct), classHandlerQuote(method))
+          (iQuote, ptnToHandlerQuote(ct, handlerQuote, pattern))
+      }
+    }.unzip
+
+    val traitMeth = itemMethNm(tpe.toString + "_family")
+    q"""
+      ${traitMethodQuote(traitMeth, itemQuotes, matchQuote(onlyCaseObjects, ptnToHandlerQuotes))}
+      ${TermName(traitMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+    """
+  }
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
@@ -123,7 +158,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def materializeTemplate[T: c.WeakTypeTag](c: Context)(quoteFunc: c.universe.Type => c.universe.Tree): c.Expr[FP[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-
     val result = quoteFunc(tpe)
     println(result)
     c.Expr[FP[T]](result)
