@@ -97,22 +97,22 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType)
+    }.map(_.asInstanceOf[Symbol].asType.toType)
 
-    val onlyCaseObjects = childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType))
+    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
     val (itemQuotes, caseQuotes) = {
-      childTypeSyms.map {
-        cts =>
-          val pattern = removePkgName(cts.asClass.name.toString)
+      childTypes.map {
+        ct =>
+          val pattern = removePkgName(tpeClassNm(c)(ct))
           val method = itemMethNm(pattern)
           val (iQuote, caseHandler) =
-            if (hasNoAccessor(c)(cts.toType))
-              (objectQuote(c)(cts.toType)(method)(onlyCaseObjects), q"${TermName(method)}")
+            if (hasNoAccessor(c)(ct))
+              (objectQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
             else
-              (itemQuote(c)(cts.toType)(method), q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))""")
+              (itemQuote(c)(ct)(method), q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))""")
           (iQuote, cq"""$pattern => $caseHandler""")
       }
     }.unzip
@@ -132,7 +132,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
         """
 
     val traitFamilyMeth = itemMethNm(tpe.toString + "_family")
-    // TODO try to use another namei instead of objNm inside TermName(objNm)
     q"""
       def ${TermName(traitFamilyMeth)}(${TermName(objNm)}: ${TypeName("J")}) = {
         ..$itemQuotes

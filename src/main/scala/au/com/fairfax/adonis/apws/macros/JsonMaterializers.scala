@@ -35,7 +35,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
   def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (String, String, List[c.universe.Tree]) => c.universe.Tree) = {
-    import c.universe._
     val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => itemMethNm(t.toString))
     val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
       if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
@@ -75,7 +74,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
     println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
 
-    //    println(s"recurQuote, tpe = $tpe, tpe.dealias = ${tpe.dealias}, accessors = $accessors")
     tpe match {
       // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>

@@ -89,7 +89,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def objectQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
-    val typeName = removePkgName(tpe.typeSymbol.asClass.name.toString)
+    val typeName = removePkgName(tpeClassNm(c)(tpe))
     val buildQuote =
       if (areSiblingCaseObjs)
         q"""${TermName(jsonIO)}.makeString($typeName)"""
@@ -106,32 +106,31 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    val childTypeSyms = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
       des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType)
+    }.map(_.asInstanceOf[Symbol].asType.toType)
 
-    val onlyCaseObjects = childTypeSyms forall (cts => hasNoAccessor(c)(cts.toType))
+    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
     val (itemQuotes, caseQuotes) = {
-      childTypeSyms.map {
-        cts =>
-          val pattern = removePkgName(cts.asClass.name.toString)
+      childTypes.map {
+        ct =>
+          val pattern = removePkgName(tpeClassNm(c)(ct))
           val method = itemMethNm(pattern)
           val (iQuote, caseHandler) =
-            if (hasNoAccessor(c)(cts.toType))
-              (objectQuote(c)(cts.toType)(method)(onlyCaseObjects), q"${TermName(method)}")
+            if (hasNoAccessor(c)(ct))
+              (objectQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
             else
-              (itemQuoteTemplate(c)(cts.toType)(method) {
+              (itemQuoteTemplate(c)(ct)(method) {
                 varName =>
-                  val ctsType = cts.toType
-                  val ctsTypeName = removePkgName(cts.asClass.name.toString)
+                  val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
                   val accessorQuotes =
                     List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-                      q""" "v" -> ${recurQuote(c)(ctsType)(varName)(fieldNm)} """)
-                  structuredTypeQuote(c)(ctsType)(varName)(fieldNm)(accessorQuotes)
+                      q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
+                  structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
               },
                 q"""${TermName(method)}(${TermName(varBeMatched)})""")
-          (iQuote, cq"""${TermName(varBeMatched)} : ${cts.toType} => $caseHandler""")
+          (iQuote, cq"""${TermName(varBeMatched)} : ${ct} => $caseHandler""")
       }
     }.unzip
 
