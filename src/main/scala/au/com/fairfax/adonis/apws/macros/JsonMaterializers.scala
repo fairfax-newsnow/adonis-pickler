@@ -67,14 +67,17 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
 
-  def sealedTraitQuoteTemplate(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)
-                              (classItemQuote: (String, c.universe.Type) => c.universe.Tree)
-                              (classHandlerQuote: String => c.universe.Tree)
-                              (ptnToHandlerQuote: (c.universe.Type, c.universe.Tree, String) => c.universe.Tree)
-                              (matchQuote: (Boolean, Set[c.universe.Tree]) => c.universe.Tree)
-                              (traitMethodQuote: (String, Set[c.universe.Tree], c.universe.Tree)=> c.universe.Tree): c.universe.Tree = {
+  def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree
+
+  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree
+
+  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
+
+  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree
+
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
     val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
@@ -92,14 +95,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
             if (hasNoAccessor(c)(ct))
               (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
             else
-              (classItemQuote(method, ct), classHandlerQuote(method))
-          (iQuote, ptnToHandlerQuote(ct, handlerQuote, pattern))
+              (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+          (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
       }
     }.unzip
 
     val traitMeth = itemMethNm(tpe.toString + "_family")
     q"""
-      ${traitMethodQuote(traitMeth, itemQuotes, matchQuote(onlyCaseObjects, ptnToHandlerQuotes))}
+      ${traitMethodQuote(c)(tpe)(traitMeth)(itemQuotes)(objNm)(ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm))}
       ${TermName(traitMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }

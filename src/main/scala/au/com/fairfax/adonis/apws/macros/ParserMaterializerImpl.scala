@@ -3,7 +3,6 @@ package au.com.fairfax.adonis.apws.macros
 import scala.reflect.macros.blackbox.Context
 import au.com.fairfax.adonis.apws.macros.json._
 import Materializer._
-import au.com.fairfax.adonis.utils._
 
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   lazy val jsonIO: String = "reader"
@@ -94,38 +93,45 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"def ${TermName(methodNm)} = new $tpe"
   }
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val classItemQuote: (String, Type) => Tree =
-      (method, ct) => itemQuote(c)(ct)(method)
-    val classHandlerQuote: String => Tree =
-      method =>
-        q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))"""
-    val ptnToHandlerQuote: (Type, Tree, String) => Tree =
-      (ct, handlerQuote, pattern) => cq"""$pattern => $handlerQuote"""
-    val matchQuote: (Boolean, Set[Tree]) => Tree =
-      (onlyCaseObjects, ptnToHandlerQuotes) =>
-        if (onlyCaseObjects)
-          q"""
-            ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
-              case ..$ptnToHandlerQuotes
-            }
-          """
-        else
-          q"""
-            ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
-              case ..$ptnToHandlerQuotes
-            }
-          """
-    val traitMethodQuote: (String, Set[Tree], Tree) => Tree =
-      (method, itemQuotes, matchQuote) =>
-        q"""
-          def ${TermName(method)}(${TermName(objNm)}: ${TypeName("J")}) = {
-            ..$itemQuotes
-            $matchQuote
-          }
-        """
-    sealedTraitQuoteTemplate(c)(tpe)(objNm)(fieldNm)(classItemQuote)(classHandlerQuote)(ptnToHandlerQuote)(matchQuote)(traitMethodQuote)
+    itemQuote(c)(ct)(method)
+  }
+
+  def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
+    import c.universe._
+    q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))"""
+  }
+
+  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
+    import c.universe._
+    cq"""$pattern => $handlerQuote"""
+  }
+
+  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {
+    import c.universe._
+    if (onlyCaseObjects)
+      q"""
+        ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+          case ..$ptnToHandlerQuotes
+        }
+      """
+    else
+      q"""
+        ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+          case ..$ptnToHandlerQuotes
+        }
+      """
+  }
+
+  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
+    import c.universe._
+    q"""
+      def ${TermName(method)}(${TermName(objNm)}: ${TypeName("J")}) = {
+        ..$itemQuotes
+        $matchQuote
+      }
+    """
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
@@ -139,7 +145,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
             }
           }
           GenJsonParser
-      """
+        """
     }
   }
 }

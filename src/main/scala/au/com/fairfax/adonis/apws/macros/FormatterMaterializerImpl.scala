@@ -101,39 +101,47 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val classItemQuote: (String, Type) => Tree =
-      (method, ct) =>
-        itemQuoteTemplate(c)(ct)(method) {
-          varName =>
-            val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
-            val accessorQuotes =
-              List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-                q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
-            structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
-        }
-    val varBeMatched = "obj"
-    val classHandlerQuote: String => Tree =
-      method => q"${TermName(method)}(${TermName(varBeMatched)})"
-    val ptnToHandlerQuote: (Type, Tree, String) => Tree =
-      (ct, handlerQuote, _) => cq"${TermName(varBeMatched)} : ${ct} => $handlerQuote"
-    val matchQuote: (Boolean, Set[Tree]) => Tree =
-      (onlyCaseObjects, ptnToHandlerQuotes) =>
-        q"""
-          ${TermName(objNm)} match {
-            case ..$ptnToHandlerQuotes
-          }
-        """
-    val traitMethodQuote: (String, Set[Tree], Tree) => Tree =
-      (method, itemQuotes, matchQuote) =>
-        q"""
-          def ${TermName(method)}(${TermName(objNm)}: $tpe) = {
-            ..$itemQuotes
-            $matchQuote
-          }
-        """
-    sealedTraitQuoteTemplate(c)(tpe)(objNm)(fieldNm)(classItemQuote)(classHandlerQuote)(ptnToHandlerQuote)(matchQuote)(traitMethodQuote)
+    itemQuoteTemplate(c)(ct)(method) {
+      varName =>
+        val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
+        val accessorQuotes =
+          List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
+            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
+        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
+    }
+  }
+
+  private lazy val varBeMatched = "obj"
+
+  def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
+    import c.universe._
+    q"${TermName(method)}(${TermName(varBeMatched)})"
+  }
+
+  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
+    import c.universe._
+    cq"${TermName(varBeMatched)} : ${ct} => $handlerQuote"
+  }
+
+  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {
+    import c.universe._
+    q"""
+      ${TermName(objNm)} match {
+        case ..$ptnToHandlerQuotes
+      }
+    """
+  }
+
+  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
+    import c.universe._
+    q"""
+      def ${TermName(method)}(${TermName(objNm)}: $tpe) = {
+        ..$itemQuotes
+        $matchQuote
+      }
+    """
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
