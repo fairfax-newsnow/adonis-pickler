@@ -16,17 +16,3 @@ trait JsonFormatter[T] extends FormatterParser[T] {
 }
 
 object JsonFormatter extends FormatterMaterializer
-
-
-//TODO BACKUP classes, should be removed
-trait JsonParserBACKUP[T] {
-  def parse[J](json: J)(implicit reader: JReader[J]): T
-}
-
-object JsonParserBACKUP extends JsonMaterializersBACKUP
-
-trait JsonFormatterBACKUP[T] {
-  def format[J](obj: Any)(implicit builder: JBuilder[J]): J
-}
-
-object JsonFormatterBACKUP extends JsonMaterializersBACKUP

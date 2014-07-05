@@ -7,8 +7,11 @@ import au.com.fairfax.adonis.apws.macros.json._
 import scala.language.higherKinds
 
 object Materializer {
-  def itemMethNm(inStr: String): String =
-    List("handle", inStr).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
+  def itemMethNm(typeName: String): String =
+    List("handle", typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
+
+  def simpleTypeNm(typeName: String): String =
+    typeName.split("\\.").toList.dropWhile(typeName => typeName(0) < 'A' || typeName(0) > 'Z').mkString(".")
 }
 
 trait Materializer[FP[_] <: FormatterParser[_]] {
@@ -89,7 +92,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     val (itemQuotes, ptnToHandlerQuotes) = {
       childTypes.map {
         ct =>
-          val pattern = removePkgName(tpeClassNm(c)(ct))
+          val pattern = simpleTypeNm(tpeClassNm(c)(ct))
           val method = itemMethNm(pattern)
           val (iQuote, handlerQuote) =
             if (hasNoAccessor(c)(ct))

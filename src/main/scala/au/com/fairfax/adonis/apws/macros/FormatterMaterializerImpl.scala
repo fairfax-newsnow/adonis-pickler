@@ -89,10 +89,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
-    val typeName = removePkgName(tpeClassNm(c)(tpe))
+    val typeName = simpleTypeNm(tpeClassNm(c)(tpe))
     val buildQuote =
       if (areSiblingCaseObjs)
-        q"${TermName(jsonIO)}.makeString($typeName)"
+        toJsonStringQuote(c)(typeName)
       else
         q"""${TermName(jsonIO)}.makeObject("t" -> ${toJsonStringQuote(c)(typeName)}, "v" -> ${toJsonStringQuote(c)("")})"""
     q"""
@@ -105,7 +105,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
       varName =>
-        val ctsTypeName = removePkgName(tpeClassNm(c)(ct))
+        val ctsTypeName = simpleTypeNm(tpeClassNm(c)(ct))
         val accessorQuotes =
           List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
             q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
