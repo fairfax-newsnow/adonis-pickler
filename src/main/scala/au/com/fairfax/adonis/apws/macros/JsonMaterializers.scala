@@ -2,13 +2,13 @@ package au.com.fairfax.adonis.apws.macros
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
-import au.com.fairfax.adonis.utils._
+//import au.com.fairfax.adonis.utils._
 import au.com.fairfax.adonis.apws.macros.json._
 import scala.language.higherKinds
 
 object Materializer {
   def itemMethNm(typeName: String): String =
-    List("handle", typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(removePkgName).mkString("_")
+    List("handle", typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.").mkString("_")
 
   def simpleTypeNm(typeName: String): String =
     typeName.split("\\.").toList.dropWhile(typeName => typeName(0) < 'A' || typeName(0) > 'Z').mkString(".")
@@ -92,7 +92,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     val (itemQuotes, ptnToHandlerQuotes) = {
       childTypes.map {
         ct =>
-          val pattern = simpleTypeNm(tpeClassNm(c)(ct))
+          val pattern = simpleTypeNm(ct.toString)
           val method = itemMethNm(pattern)
           val (iQuote, handlerQuote) =
             if (hasNoAccessor(c)(ct))
@@ -113,7 +113,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
+//    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
 
     tpe match {
       // a numeric type

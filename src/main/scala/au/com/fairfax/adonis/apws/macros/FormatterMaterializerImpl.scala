@@ -3,7 +3,6 @@ package au.com.fairfax.adonis.apws.macros
 import scala.reflect.macros.blackbox.Context
 import au.com.fairfax.adonis.apws.macros.json._
 import Materializer._
-import au.com.fairfax.adonis.utils._
 
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   lazy val jsonIO: String = "builder"
@@ -89,7 +88,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
-    val typeName = simpleTypeNm(tpeClassNm(c)(tpe))
+    val typeName = simpleTypeNm(tpe.toString)
     val buildQuote =
       if (areSiblingCaseObjs)
         toJsonStringQuote(c)(typeName)
@@ -105,7 +104,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
       varName =>
-        val ctsTypeName = simpleTypeNm(tpeClassNm(c)(ct))
+        val ctsTypeName = simpleTypeNm(ct.toString)
         val accessorQuotes =
           List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
             q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
