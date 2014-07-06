@@ -8,10 +8,10 @@ import scala.language.higherKinds
 
 object Materializer {
   def itemMethNm(typeName: String): String =
-    List("handle", typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.").mkString("_")
+    ("handle" :: List(typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.")).mkString("_")
 
   def simpleTypeNm(typeName: String): String =
-    typeName.split("\\.").toList.dropWhile(typeName => typeName(0) < 'A' || typeName(0) > 'Z').mkString(".")
+    typeName.split("\\.").toList.dropWhile(s => s(0) < 'A' || s(0) > 'Z').mkString(".")
 }
 
 trait Materializer[FP[_] <: FormatterParser[_]] {
