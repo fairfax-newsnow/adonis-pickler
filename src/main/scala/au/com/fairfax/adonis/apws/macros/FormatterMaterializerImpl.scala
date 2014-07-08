@@ -32,16 +32,16 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     mapTemplateQuote(c)(keyTpe)(valTpe) {
       (keyMeth, valMeth, itemQuotes) =>
         q"""
-        def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
-          ..$itemQuotes
-          val elems =
-            map.map { t =>
-              val (k, v) = t
-              ${TermName(jsonIO)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
-            }.toList
-          ${TermName(jsonIO)}.makeArray(elems: _*)
-        }
-      """
+          def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
+            ..$itemQuotes
+            val elems =
+              map.map { t =>
+                val (k, v) = t
+                ${TermName(jsonIO)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
+              }.toList
+            ${TermName(jsonIO)}.makeArray(elems: _*)
+          }
+        """
     }
   }
 
@@ -57,6 +57,23 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           ${TermName(jsonIO)}.makeArray(jsonList: _*)
         }
       """
+  }
+
+  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+    import c.universe._
+    val formatMeth = itemMethNm(tpe.toString)
+    val caseQuotes = List(
+      cq"Some(v) => ${TermName(formatMeth)}(v)",
+      cq"None => ${TermName(jsonIO)}.makeNull()")
+
+    q"""
+      def ${TermName(methodNm)}(opt: Option[$tpe]) = {
+        ${itemQuote(c)(tpe)(formatMeth)}
+        opt match {
+          case ..$caseQuotes
+        }
+      }
+    """
   }
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {

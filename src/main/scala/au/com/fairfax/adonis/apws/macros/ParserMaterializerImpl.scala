@@ -59,6 +59,20 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
+  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+    import c.universe._
+    val createMeth = itemMethNm(tpe.toString)
+    q"""
+      def ${TermName(methodNm)}(json: J): Option[$tpe] = {
+        ${itemQuote(c)(tpe)(createMeth)}
+        if (${TermName(jsonIO)}.isNull(json))
+          None
+        else
+          Some(${TermName(createMeth)}(json))
+      }
+    """
+  }
+
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val quote = q"${TermName(jsonIO)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
@@ -104,7 +118,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
     import c.universe._
-    cq"""$pattern => $handlerQuote"""
+    cq"$pattern => $handlerQuote"
   }
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {

@@ -56,6 +56,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
 
+  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
+
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
@@ -124,19 +126,26 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
-        val handleCollection = "handleCollection"
+        val handleMeth = "handleCollection"
         q"""
-            ${collectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(handleCollection)}
-            ${TermName(handleCollection)}(${fieldQuote(c)(objNm)(fieldNm)})
+            ${collectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(handleMeth)}
+            ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
-        val handleMap = "handleMap"
+        val handleMeth = "handleMap"
         val List(key, value) = t.typeArgs
         q"""
-            ${mapQuote(c)(key)(value)(handleMap)}
-            ${TermName(handleMap)}(${fieldQuote(c)(objNm)(fieldNm)})
+            ${mapQuote(c)(key)(value)(handleMeth)}
+            ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+        """
+      // an option type
+      case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
+        val handleMeth = "handleOption"
+        q"""
+           ${optionQuote(c)(t.typeArgs.head)(handleMeth)}
+           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // a sealed trait
@@ -163,7 +172,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     import c.universe._
     val tpe = weakTypeOf[T]
     val result = quoteFunc(tpe)
-    println(result)
+//    println(result)
     c.Expr[FP[T]](result)
   }
 }
