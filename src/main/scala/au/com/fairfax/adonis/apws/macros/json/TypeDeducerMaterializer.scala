@@ -4,6 +4,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
 import scala.language.higherKinds
 
+//TODO be removed
 object TypeDeducerMaterializerImpl {
   def materialize[T: c.WeakTypeTag](c:Context): c.Expr[TypeDeducer[T]] = {
     import c.universe._
