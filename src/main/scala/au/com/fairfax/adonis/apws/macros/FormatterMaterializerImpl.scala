@@ -1,7 +1,6 @@
 package au.com.fairfax.adonis.apws.macros
 
 import scala.reflect.macros.blackbox.Context
-import au.com.fairfax.adonis.apws.macros.json._
 import Materializer._
 
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
@@ -148,8 +147,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     materializeTemplate(c) {
       tpe =>
         q"""
-          object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.json.JsonFormatter[$tpe] {
-            override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.utils.json.JBuilder[J]) = {
+          implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
+            override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
               ${TermName(jsonIO)}.makeObject(
                 "cmd" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),

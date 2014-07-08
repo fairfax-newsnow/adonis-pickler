@@ -1,7 +1,6 @@
 package au.com.fairfax.adonis.apws.macros
 
 import scala.reflect.macros.blackbox.Context
-import au.com.fairfax.adonis.apws.macros.json._
 import Materializer._
 
 object ParserMaterializerImpl extends Materializer[JsonParser] {
@@ -139,8 +138,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     materializeTemplate(c) {
       tpe =>
         q"""
-          object GenJsonParser extends au.com.fairfax.adonis.apws.macros.json.JsonParser[$tpe] {
-            override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.utils.json.JReader[J]) = {
+          implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[$tpe] {
+            override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
               ${recurQuote(c)(tpe)("json")("args")}
             }
           }

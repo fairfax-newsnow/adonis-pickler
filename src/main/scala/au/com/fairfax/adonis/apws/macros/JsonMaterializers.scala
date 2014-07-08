@@ -1,9 +1,7 @@
 package au.com.fairfax.adonis.apws.macros
 
 import scala.language.experimental.macros
-import scala.reflect.macros.blackbox._
-//import au.com.fairfax.adonis.utils._
-import au.com.fairfax.adonis.apws.macros.json._
+import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
 
 object Materializer {
