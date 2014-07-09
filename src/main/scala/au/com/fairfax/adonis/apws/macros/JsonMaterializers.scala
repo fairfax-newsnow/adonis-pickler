@@ -78,9 +78,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
 
-  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree
+  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(methodNm: String): c.universe.Tree = {
     import c.universe._
 
     val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
@@ -103,17 +103,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       }
     }.unzip
 
-    val traitMeth = itemMethNm(tpe.toString + "_family")
     q"""
-      ${traitMethodQuote(c)(tpe)(traitMeth)(itemQuotes)(objNm)(ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm))}
-      ${TermName(traitMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+      ${traitMethodQuote(c)(tpe)(methodNm)(itemQuotes)(objNm)(ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm))}
     """
   }
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-
-//    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
 
     tpe match {
       // a numeric type
@@ -128,8 +124,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
         val handleMeth = "handleCollection"
         q"""
-            ${collectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(handleMeth)}
-            ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+          ${collectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(handleMeth)}
+          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // a map type
@@ -137,20 +133,24 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val handleMeth = "handleMap"
         val List(key, value) = t.typeArgs
         q"""
-            ${mapQuote(c)(key)(value)(handleMeth)}
-            ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+          ${mapQuote(c)(key)(value)(handleMeth)}
+          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
         val handleMeth = "handleOption"
         q"""
-           ${optionQuote(c)(t.typeArgs.head)(handleMeth)}
-           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+          ${optionQuote(c)(t.typeArgs.head)(handleMeth)}
+          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        sealedTraitQuote(c)(t)(objNm)(fieldNm)
+        val handleMeth = itemMethNm(t.toString + "_traitFamily")
+        q"""
+          ${sealedTraitQuote(c)(t)(objNm)(fieldNm)(handleMeth)}
+          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+        """
 
       // a structured type
       case _ =>

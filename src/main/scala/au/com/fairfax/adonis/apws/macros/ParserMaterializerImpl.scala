@@ -137,10 +137,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
-  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
+  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(method)}(${TermName(objNm)}: ${TypeName("J")}) = {
+      def ${TermName(methodNm)}(${TermName(objNm)}: ${TypeName("J")}) = {
         ..$itemQuotes
         $matchQuote
       }
