@@ -164,6 +164,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
             }
             structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
+          case other =>
+            println("Can't match: " + tpe)
+            throw new Error("Ooops")
         }
     }
   }
