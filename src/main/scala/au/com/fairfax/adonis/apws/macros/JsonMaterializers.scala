@@ -113,7 +113,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-//    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion = ${tpe.companion}")
+//    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion l = ${tpe.companion}")
 
     tpe match {
       // a numeric type
