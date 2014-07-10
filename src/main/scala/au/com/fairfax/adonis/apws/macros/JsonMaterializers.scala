@@ -3,13 +3,12 @@ package au.com.fairfax.adonis.apws.macros
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
+import au.com.fairfax.adonis.utils.simpleTypeNm
 
 object Materializer {
   def itemMethNm(typeName: String): String =
     ("handle" :: List(typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.")).mkString("_")
 
-  def simpleTypeNm(typeName: String): String =
-    typeName.split("\\.").toList.dropWhile(s => s(0) < 'A' || s(0) > 'Z').mkString(".")
 }
 
 trait Materializer[FP[_] <: FormatterParser[_]] {
@@ -60,6 +59,31 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String): c.universe.Tree = {
+    import c.universe._
+    val nonNullQuote = q"${TermName(jsonIO)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
+    q"""
+      $preQuote
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nonNullQuote)}
+    """
+  }
+
+  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree
+
+  def nullQuote(c: Context): c.universe.Tree
+
+  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nonNullQuote: c.universe.Tree): c.universe.Tree = {
+    import c.universe._
+    q"""
+      if ($nullCheckQuote)
+        ${nullQuote(c)}
+      else
+        $nonNullQuote
+    """
+  }
+
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
 
   def ioActionString: String
@@ -78,7 +102,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
 
-  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree
 
   def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(methodNm: String): c.universe.Tree = {
     import c.universe._
@@ -89,23 +113,25 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
     val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
-    val (itemQuotes, ptnToHandlerQuotes) = {
-      childTypes.map {
-        ct =>
-          val pattern = simpleTypeNm(ct.toString)
-          val method = itemMethNm(pattern)
-          val (iQuote, handlerQuote) =
-            if (hasNoAccessor(c)(ct))
-              (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
-            else
-              (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
-          (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
-      }
+    val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
+      ct =>
+        val pattern = simpleTypeNm(ct.toString)
+        val method = itemMethNm(pattern)
+        val (iQuote, handlerQuote) =
+          if (hasNoAccessor(c)(ct))
+            (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
+          else
+            (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+        (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
     }.unzip
 
-    q"""
-      ${traitMethodQuote(c)(tpe)(methodNm)(itemQuotes)(objNm)(ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm))}
-    """
+    val nonNullQuote =
+      q"""
+        ..$itemQuotes
+        ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
+      """
+
+    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nonNullQuote)}")
   }
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
@@ -116,9 +142,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
         numericValQuote(c)(t)(objNm)(fieldNm)
 
-      // boolean or string type
-      case t: Type if List(deliasTpeName[Boolean](c), deliasTpeName[String](c)) contains t.dealias.toString =>
-        q"${TermName(jsonIO)}.${TermName(ioActionString + t.dealias.toString)}(${fieldQuote(c)(objNm)(fieldNm)})"
+      // string type
+      case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
+        stringQuote(c)(objNm)(fieldNm)
+
+      // boolean type
+      case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
+        q"${TermName(jsonIO)}.${TermName(ioActionString + "Boolean")}(${fieldQuote(c)(objNm)(fieldNm)})"
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
@@ -136,6 +166,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
           ${mapQuote(c)(key)(value)(handleMeth)}
           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
+
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
         val handleMeth = "handleOption"

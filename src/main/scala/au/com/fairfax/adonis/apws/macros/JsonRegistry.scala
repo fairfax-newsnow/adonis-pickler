@@ -3,6 +3,7 @@ package au.com.fairfax.adonis.apws.macros
 import scala.collection.mutable.{HashMap => MHashMap}
 
 import scala.reflect.ClassTag
+import au.com.fairfax.adonis.utils.simpleTypeNm
 
 object JsonRegistry extends BaseJsonRegistry
 
@@ -16,9 +17,11 @@ class BaseJsonRegistry extends JsonRegistry {
   private val parsers = new MHashMap[String, JsonParser[_]]
   private val formatters = new MHashMap[String, JsonFormatter[_]]
   lazy val strReplacement: String Map String =
-    List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
+    (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
       s => s -> s.capitalize
-    }.toMap
+    } ::: List(className[String]).map{
+      s => s -> simpleTypeNm(s)
+    }).toMap
 
   private def className[T: ClassTag] = implicitly[ClassTag[T]].runtimeClass.getName
 
@@ -32,8 +35,8 @@ class BaseJsonRegistry extends JsonRegistry {
     parsers += (key -> parser)
     formatters += (key -> formatter)
 
-    //    println(s"parsers.key = ${parsers.keys.toList}")
-    //    println(s"formatters.key = ${formatters.keys.toList}")
+//    println(s"parsers.key = ${parsers.keys.toList}")
+//    println(s"formatters.key = ${formatters.keys.toList}")
   }
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J]): J = {

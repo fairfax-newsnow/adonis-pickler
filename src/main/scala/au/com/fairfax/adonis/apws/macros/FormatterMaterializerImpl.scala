@@ -1,6 +1,7 @@
 package au.com.fairfax.adonis.apws.macros
 
 import scala.reflect.macros.blackbox.Context
+import au.com.fairfax.adonis.utils.simpleTypeNm
 import Materializer._
 
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
@@ -31,8 +32,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     mapTemplateQuote(c)(keyTpe)(valTpe) {
       (keyMeth, valMeth, itemQuotes) =>
-        q"""
-          def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
+        val nonNullQuote =
+          q"""
             ..$itemQuotes
             val elems =
               map.map { t =>
@@ -40,6 +41,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
                 ${TermName(jsonIO)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
               }.toList
             ${TermName(jsonIO)}.makeArray(elems: _*)
+          """
+
+        q"""
+          def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
+            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
           }
         """
     }
@@ -48,15 +54,20 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {
     import c.universe._
     val formatMeth = itemMethNm(tpe.toString)
-    q"""
-        def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
-          ${itemQuote(c)(tpe)(formatMeth)}
-          val jsonList = objList.map {
-            obj => ${TermName(formatMeth)}(obj)
-          }
-          ${TermName(jsonIO)}.makeArray(jsonList: _*)
+    val nonNullQuote =
+      q"""
+        ${itemQuote(c)(tpe)(formatMeth)}
+        val jsonList = objList.map {
+          obj => ${TermName(formatMeth)}(obj)
         }
+        ${TermName(jsonIO)}.makeArray(jsonList: _*)
       """
+
+    q"""
+      def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
+        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "objList"))(nonNullQuote)}
+      }
+    """
   }
 
   def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
@@ -84,6 +95,21 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${TermName(jsonIO)}.makeNumber($numQuote)"
   }
 
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    stringQuoteTemplate(c)(q"")(objNm)
+  }
+
+  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
+    import c.universe._
+    q"${TermName(varBeChecked)} == null"
+  }
+
+  def nullQuote(c: Context): c.universe.Tree = {
+    import c.universe._
+    q""" ${TermName(jsonIO)}.${TermName("makeNull")} """
+  }
+
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"${TermName(objNm)}"
@@ -99,7 +125,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
-    q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
+    val nonNullQuote = q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
+    q"${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = objNm))(nonNullQuote)}"
   }
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
@@ -149,12 +176,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
       def ${TermName(methodNm)}(${TermName(objNm)}: $tpe) = {
-        ..$itemQuotes
-        $matchQuote
+        $quote
       }
     """
   }
