@@ -139,10 +139,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"def ${TermName(methodNm)} = new $tpe"
   }
 
-  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
-    import c.universe._
+  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
     itemQuote(c)(ct)(method)
-  }
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
     import c.universe._
