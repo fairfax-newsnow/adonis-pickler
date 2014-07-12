@@ -38,12 +38,25 @@ class BaseJsonRegistry extends JsonRegistry {
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J]): J = {
     val key = toMapKey(className[T])
-    formatters(key).format(obj)
+    formatters.get(key) match {
+      case Some(formatter) =>
+        formatter format obj
+
+      case None =>
+        throw new Error(s"No formatter exists for $key")
+    }
   }
 
   override def parse[J](json: J)(implicit reader: JReader[J]): Any = {
     val cmdType = reader.readString(reader.readObjectField(json, "cmd"))
-    parsers(toMapKey(cmdType)).parse(json)
+    val key = toMapKey(cmdType)
+    parsers.get(key) match {
+      case Some(parser) =>
+        parser parse json
+
+      case None =>
+        throw new Error(s"No parser exists for $key")
+    }
   }
 
 }
