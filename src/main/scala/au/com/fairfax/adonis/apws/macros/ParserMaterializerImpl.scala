@@ -73,6 +73,30 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
+  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    val leftTpe = tpe.typeArgs.head
+    val rightTpe = tpe.typeArgs.last
+    val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
+    val simpleRightTpe = simpleTypeNm(rightTpe.toString)
+    val leftMeth = itemMethNm(leftTpe.toString)
+    val rightMeth = itemMethNm(rightTpe.toString)
+
+    q"""
+      def ${TermName(methodNm)}(json: J): Either[$leftTpe, $rightTpe] = {
+        ${caseClassItemQuote(c)(leftMeth)(leftTpe)("")}
+        ${caseClassItemQuote(c)(rightMeth)(rightTpe)("")}
+        val value = ${TermName(jsonIO)}.readObjectField(json, "v")
+        val providedTypeName = ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(json, "t"))
+        providedTypeName match {
+          case $simpleLeftTpe => Left(${TermName(leftMeth)}(value))
+          case $simpleRightTpe => Right(${TermName(rightMeth)}(value))
+          case missed => throw new Error("Can't match: " + missed)
+        }
+      }
+    """
+  }
+
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val quote = q"${TermName(jsonIO)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"

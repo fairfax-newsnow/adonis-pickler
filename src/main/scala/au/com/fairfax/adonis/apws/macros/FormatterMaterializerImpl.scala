@@ -76,6 +76,29 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    val leftTpe = tpe.typeArgs.head
+    val rightTpe = tpe.typeArgs.last
+    val leftFormatMeth = itemMethNm(leftTpe.toString)
+    val rightFormatMeth = itemMethNm(rightTpe.toString)
+    //caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String)
+    val caseQuotes = List(
+      cq"""Left(v) => ${TermName(leftFormatMeth)}(v)""",
+      cq"""Right(v) => ${TermName(rightFormatMeth)}(v)"""
+    )
+
+    q"""
+      def ${TermName(methodNm)}(either: Either[$leftTpe, $rightTpe]) = {
+        ${caseClassItemQuote(c)(leftFormatMeth)(leftTpe)(fieldNm)}
+        ${caseClassItemQuote(c)(rightFormatMeth)(rightTpe)(fieldNm)}
+        either match {
+          case ..$caseQuotes
+        }
+      }
+    """
+  }
+
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val numQuote =

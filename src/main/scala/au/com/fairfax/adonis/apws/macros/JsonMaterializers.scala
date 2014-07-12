@@ -1,3 +1,4 @@
+
 package au.com.fairfax.adonis.apws.macros
 
 import scala.language.experimental.macros
@@ -57,6 +58,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
 
   def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
+
+  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
@@ -148,6 +151,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
            ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
+      // an either type
+      case t: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(t) =>
+        val handleMeth = "handleEither"
+        q"""
+           ${eitherQuote(c)(t)(handleMeth)(fieldNm: String)}
+           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+        """
+
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         sealedTraitQuote(c)(t)(objNm)(fieldNm)
@@ -165,8 +176,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
             }
             structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
           case other =>
-            println("Can't match: " + tpe)
-            throw new Error("Ooops")
+            throw new Error("Can't match: " + tpe)
         }
     }
   }
