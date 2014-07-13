@@ -118,16 +118,20 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
-    import c.universe._
-    q"""
-        val ${TermName(objNm + "_" + fieldNm)} = ${fieldQuote(c)(objNm)(fieldNm)}
-        new $tpe(..$accessorQuotes)
-    """
+    this.synchronized {
+      import c.universe._
+      q"""
+          val ${TermName(objNm + "_" + fieldNm)} = ${fieldQuote(c)(objNm)(fieldNm)}
+          new $tpe(..$accessorQuotes)
+      """
+    }
   }
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
-    import c.universe._
-    q"def ${TermName(methodNm)} = new $tpe"
+    this.synchronized {
+      import c.universe._
+      q"def ${TermName(methodNm)} = new $tpe"
+    }
   }
 
   def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
