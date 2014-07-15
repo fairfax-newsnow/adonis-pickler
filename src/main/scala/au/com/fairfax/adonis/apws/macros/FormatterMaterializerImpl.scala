@@ -15,7 +15,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree =
     itemQuoteTemplate(c)(tpe)(methodNm) {
-      recurQuote(c)(tpe)(_)("")
+      recurQuote(c)(tpe)(_)("")(false)
     }
 
   private def itemQuoteTemplate(c: Context)(tpe: c.universe.Type)(methodNm: String)(quoteFunc: String => c.universe.Tree): c.universe.Tree = {
@@ -116,7 +116,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     q"""
       val ${TermName(accessorField)} = ${TermName(objNm)}.${TermName(accessorField)}
-      $accessorField -> ${recurQuote(c)(accessorTpe)(accessorField)("")}
+      $accessorField -> ${recurQuote(c)(accessorTpe)(accessorField)("")(false)}
     """
   }
 
@@ -146,7 +146,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
         val ctsTypeName = simpleTypeNm(ct.toString)
         val accessorQuotes =
           List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)} """)
+            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)} """)
         structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
     }
   }
@@ -182,6 +182,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"formatJsSerialisable(${fieldQuote(c)(objNm)(fieldNm)})"
+  }
+
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
     materializeTemplate(c) {
@@ -190,9 +195,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
             override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
+              def formatJsSerialisable[T: scala.reflect.ClassTag](jsSerialisable: T) = {
+                au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, T](jsSerialisable)
+              }
               ${TermName(jsonIO)}.makeObject(
-                "cmd" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),
-                "args" -> ${recurQuote(c)(tpe)("typedObj")("")}
+                "t" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),
+                "args" -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
               )
             }
           }

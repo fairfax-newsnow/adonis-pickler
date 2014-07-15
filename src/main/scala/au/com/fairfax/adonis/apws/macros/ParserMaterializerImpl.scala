@@ -13,7 +13,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     import c.universe._
     q"""
       def ${TermName(methodNm)}(item: ${TypeName("J")}) =
-        ${recurQuote(c)(tpe)("item")("")}
+        ${recurQuote(c)(tpe)("item")("")(false)}
     """
   }
 
@@ -115,7 +115,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
-    recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)
+    recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)(false)
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     this.synchronized {
@@ -175,6 +175,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
+  }
+
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
     materializeTemplate(c) {
@@ -182,7 +187,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
         q"""
           implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[$tpe] {
             override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
-              ${recurQuote(c)(tpe)("json")("args")}
+              def parseJsSerialised(jsSerialised: J) =
+                au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
+
+              ${recurQuote(c)(tpe)("json")("args")(true)}
             }
           }
           GenJsonParser

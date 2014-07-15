@@ -4,6 +4,7 @@ package au.com.fairfax.adonis.apws.macros
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
+import au.com.fairfax.adonis.apws.base.JsSerialisable
 
 object Materializer {
   def itemMethNm(typeName: String): String =
@@ -113,12 +114,19 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     """
   }
 
-  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(firstRun: Boolean): c.universe.Tree = {
     import c.universe._
+    val jsSerialisable: c.universe.Type = c.mirror.typeOf[JsSerialisable]
 
 //    println(s"recurQuote, tpe = $tpe, tpe.typeSymbol = ${tpe.typeSymbol}, tpe.companion l = ${tpe.companion}")
 
     tpe match {
+      case t: Type if t <:< jsSerialisable && !firstRun =>
+        println(s"$t is serialisable")
+        jsSerialisableQuote(c)(t)(objNm)(fieldNm)
+
       // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
         numericValQuote(c)(t)(objNm)(fieldNm)

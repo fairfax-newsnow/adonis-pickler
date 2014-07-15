@@ -48,7 +48,7 @@ class BaseJsonRegistry extends JsonRegistry {
   }
 
   override def parse[J](json: J)(implicit reader: JReader[J]): Any = {
-    val cmdType = reader.readString(reader.readObjectField(json, "cmd"))
+    val cmdType = reader.readString(reader.readObjectField(json, "t"))
     val key = toMapKey(cmdType)
     parsers.get(key) match {
       case Some(parser) =>
