@@ -2,6 +2,7 @@ package au.com.fairfax.adonis.apws.macros
 
 import scala.reflect.macros.blackbox.Context
 import Materializer._
+import au.com.fairfax.adonis.utils.simpleTypeNm
 
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   lazy val jsonIO: String = "reader"
@@ -19,18 +20,24 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
+
     mapTemplateQuote(c)(keyTpe)(valTpe) {
       (keyMeth, valMeth, itemQuotes) =>
+        val nonNullQuote =
+          q"""
+              ..$itemQuotes
+              val mapSize = ${TermName(jsonIO)}.readArrayLength(map)
+              (0 until mapSize).toList.map { idx =>
+                val tuple = ${TermName(jsonIO)}.readArrayElem(map, idx)
+                val key = ${TermName(jsonIO)}.readArrayElem(tuple, 0)
+                val value = ${TermName(jsonIO)}.readArrayElem(tuple, 1)
+                ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
+              }.toMap
+          """
+
         q"""
           def ${TermName(methodNm)}(map: J) = {
-            ..$itemQuotes
-            val mapSize = ${TermName(jsonIO)}.readArrayLength(map)
-            (0 until mapSize).toList.map { idx =>
-              val tuple = ${TermName(jsonIO)}.readArrayElem(map, idx)
-              val key = ${TermName(jsonIO)}.readArrayElem(tuple, 0)
-              val value = ${TermName(jsonIO)}.readArrayElem(tuple, 1)
-              ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
-            }.toMap
+            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
           }
        """
     }
@@ -45,18 +52,25 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
             idx => ${TermName(createMeth)}(${TermName(jsonIO)}.readArrayElem(array, idx))
           }
       """
+
     val toCollQuote =
       if (collType == tpeClassNm(c)(typeOf[Seq[_]]))
         intsToItemsQuote
       else
         q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
-    q"""
-        def ${TermName(methodNm)}(array: J) = {
-          ${itemQuote(c)(tpe)(createMeth)}
-          val arraySize = ${TermName(jsonIO)}.readArrayLength(array)
-          $toCollQuote
-        }
+
+    val nonNullQuote =
+      q"""
+        ${itemQuote(c)(tpe)(createMeth)}
+        val arraySize = ${TermName(jsonIO)}.readArrayLength(array)
+        $toCollQuote
       """
+
+    q"""
+      def ${TermName(methodNm)}(array: J) = {
+        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nonNullQuote)}
+      }
+    """
   }
 
   def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
@@ -106,6 +120,24 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       q"${quote}.asInstanceOf[$tpe]"
   }
 
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+
+    val varBeChecked = objNm + "_" + fieldNm
+    val preQuote = q"val ${TermName(varBeChecked)} = ${fieldQuote(c)(objNm)(fieldNm)}"
+    stringQuoteTemplate(c)(preQuote)(varBeChecked)
+  }
+
+  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
+    import c.universe._
+    q"${TermName(jsonIO)}.${TermName("isNull")}(${TermName(varBeChecked)})"
+  }
+
+  def nullQuote(c: Context): c.universe.Tree = {
+    import c.universe._
+    q"null"
+  }
+
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     if (fieldNm == "")
@@ -118,13 +150,13 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)(false)
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
-    this.synchronized {
-      import c.universe._
-      q"""
-          val ${TermName(objNm + "_" + fieldNm)} = ${fieldQuote(c)(objNm)(fieldNm)}
-          new $tpe(..$accessorQuotes)
-      """
-    }
+    import c.universe._
+    val nonNullQuote = q"new $tpe(..$accessorQuotes)"
+    val assignedVar = objNm + "_" + fieldNm
+    q"""
+      val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nonNullQuote)}
+    """
   }
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
@@ -134,10 +166,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     }
   }
 
-  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
-    import c.universe._
+  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
     itemQuote(c)(ct)(method)
-  }
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
     import c.universe._
@@ -165,12 +195,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
-  def traitMethodQuote(c: Context)(tpe: c.universe.Type)(method: String)(itemQuotes: Set[c.universe.Tree])(objNm: String)(matchQuote: c.universe.Tree): c.universe.Tree = {
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(method)}(${TermName(objNm)}: ${TypeName("J")}) = {
-        ..$itemQuotes
-        $matchQuote
+      def ${TermName(methodNm)}(${TermName(objNm)}: ${TypeName("J")}) = {
+        $quote
       }
     """
   }
