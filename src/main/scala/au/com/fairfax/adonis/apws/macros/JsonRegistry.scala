@@ -46,15 +46,12 @@ class BaseJsonRegistry extends JsonRegistry {
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
-    println("registering: " + key)
     parsers += (key -> parser)
     formatters += (key -> formatter)
   }
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
-    println("key: " + key)
-    println("className: " + toMapKey(className[T]))
     formatters.get(if (key == "T") toMapKey(className[T]) else key) match {
       case Some(formatter) =>
         formatter format obj
@@ -72,8 +69,6 @@ class BaseJsonRegistry extends JsonRegistry {
         parser parse json
 
       case None =>
-        println("Registered parsers")
-        parsers.keys.foreach(println(_))
         throw new Error(s"No parser exists for $key")
     }
   }
@@ -84,7 +79,6 @@ object TypeKeyProvider {
   def materializeTypeKeyProvider[T: c.WeakTypeTag](c: Context) = {
     import c.universe._
     val typeTag = c.universe.weakTypeOf[T]
-    println("Materialising: " + typeTag.toString)
     q"""
     val provider = new au.com.fairfax.adonis.apws.macros.TypeKeyProvider[$typeTag] {
       def key: String = ${typeTag.toString()}

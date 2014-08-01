@@ -210,7 +210,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    q"formatJsSerialisable(${fieldQuote(c)(objNm)(fieldNm)})"
+    q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
@@ -221,9 +221,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
             override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
-              def formatJsSerialisable[T: scala.reflect.ClassTag](jsSerialisable: T) = {
-                au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, T](jsSerialisable)
-              }
               ${TermName(jsonIO)}.makeObject(
                 "t" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),
                 "args" -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
