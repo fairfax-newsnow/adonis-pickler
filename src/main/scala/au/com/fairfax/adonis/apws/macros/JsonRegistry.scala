@@ -46,11 +46,13 @@ class BaseJsonRegistry extends JsonRegistry {
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
+    println(s"register, keyProvider.key = $key")
     parsers += (key -> parser)
     formatters += (key -> formatter)
   }
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
+    println(s"format, formatters = $formatters")
     val key = keyProvider.key
     formatters.get(if (key == "T") toMapKey(className[T]) else key) match {
       case Some(formatter) =>
