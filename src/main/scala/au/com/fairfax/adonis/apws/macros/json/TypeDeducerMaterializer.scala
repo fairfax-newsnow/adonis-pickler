@@ -3,9 +3,10 @@ package au.com.fairfax.adonis.apws.macros.json
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox._
 import scala.language.higherKinds
+import au.com.fairfax.adonis.utils.logging.NonActorLogging
 
 //TODO be removed
-object TypeDeducerMaterializerImpl {
+object TypeDeducerMaterializerImpl extends NonActorLogging {
   def materialize[T: c.WeakTypeTag](c:Context): c.Expr[TypeDeducer[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
@@ -24,7 +25,7 @@ object TypeDeducerMaterializerImpl {
       }
       GenTypeDeducer
     """
-    println(result)
+    log.debug(result.toString)
     c.Expr[TypeDeducer[T]](result)
   }
 }
