@@ -9,6 +9,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   lazy val ioActionString: String = "read"
 
+  def concatVarNms(varNms: String*): String =
+    varNms mkString "_"
+
   // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
@@ -37,7 +40,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
         q"""
           def ${TermName(methodNm)}(map: J) = {
-            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
+            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nullQuote(c))(nonNullQuote)}
           }
        """
     }
@@ -68,7 +71,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     q"""
       def ${TermName(methodNm)}(array: J) = {
-        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nonNullQuote)}
+        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nullQuote(c))(nonNullQuote)}
       }
     """
   }
@@ -120,12 +123,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       q"${quote}.asInstanceOf[$tpe]"
   }
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String)(nullQuote: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
 
-    val varBeChecked = objNm + "_" + fieldNm
+    val varBeChecked = concatVarNms(objNm, fieldNm)
     val preQuote = q"val ${TermName(varBeChecked)} = ${fieldQuote(c)(objNm)(fieldNm)}"
-    stringQuoteTemplate(c)(preQuote)(varBeChecked)
+    stringQuoteTemplate(c)(preQuote)(varBeChecked)(nullQuote)
   }
 
   def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
@@ -147,15 +150,15 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
-    recurQuote(c)(accessorTpe)(objNm + "_" + fieldNm)(accessorField)(false)
+    recurQuote(c)(accessorTpe)(concatVarNms(objNm, fieldNm))(accessorField)(false)
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"new $tpe(..$accessorQuotes)"
-    val assignedVar = objNm + "_" + fieldNm
+    val assignedVar = concatVarNms(objNm, fieldNm)
     q"""
       val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nonNullQuote)}
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nullQuote(c))(nonNullQuote)}
     """
   }
 
@@ -207,6 +210,24 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
+  }
+
+  def getCompanion(c: Context)(tpe: c.Type) = {
+    import c.universe._
+    val symTab = c.universe.asInstanceOf[reflect.internal.SymbolTable]
+    val pre = tpe.asInstanceOf[symTab.Type].prefix.asInstanceOf[Type]
+    c.universe.treeBuild.mkAttributedRef(pre, tpe.typeSymbol.companionSymbol)
+  }
+
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+
+    val companion = getCompanion(c)(tpe)
+
+    q"""
+      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)(q""" "N/A" """)}
+      au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
+    """
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {

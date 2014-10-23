@@ -6,6 +6,7 @@ import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
 import au.com.fairfax.adonis.apws.base.JsSerialisable
 import au.com.fairfax.adonis.utils.simpleTypeNm
+import au.com.fairfax.adonis.apws.types.Enum
 
 object Materializer {
   def itemMethNm(typeName: String): String =
@@ -63,14 +64,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String)(nullQuote: => c.universe.Tree): c.universe.Tree
 
-  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String): c.universe.Tree = {
+  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String)(nullQuote: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${TermName(jsonIO)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
     q"""
       $preQuote
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nonNullQuote)}
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nullQuote)(nonNullQuote)}
     """
   }
 
@@ -78,11 +79,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def nullQuote(c: Context): c.universe.Tree
 
-  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nonNullQuote: c.universe.Tree): c.universe.Tree = {
+  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nullQuote: => c.universe.Tree)(nonNullQuote: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
       if ($nullCheckQuote)
-        ${nullQuote(c)}
+        ${nullQuote}
       else
         $nonNullQuote
     """
@@ -135,16 +136,21 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
       """
 
-    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nonNullQuote)}")
+    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nullQuote(c))(nonNullQuote)}")
   }
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(firstRun: Boolean): c.universe.Tree = {
     import c.universe._
     val jsSerialisable: c.universe.Type = c.mirror.typeOf[JsSerialisable]
 
     tpe match {
+      case t: Type if t <:< c.mirror.typeOf[Enum] =>
+        enumObjQuote(c)(t)(objNm)(fieldNm)
+
       case t: Type if t <:< jsSerialisable && !firstRun =>
         jsSerialisableQuote(c)(t)(objNm)(fieldNm)
 
@@ -154,7 +160,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // string type
       case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
-        stringQuote(c)(objNm)(fieldNm)
+        stringQuote(c)(objNm)(fieldNm)(nullQuote(c))
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
