@@ -64,14 +64,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String)(nullQuote: => c.universe.Tree): c.universe.Tree
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String)(nullQuote: => c.universe.Tree): c.universe.Tree = {
+  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${TermName(jsonIO)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
     q"""
       $preQuote
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nullQuote)(nonNullQuote)}
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nonNullQuote)}
     """
   }
 
@@ -79,11 +79,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def nullQuote(c: Context): c.universe.Tree
 
-  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nullQuote: => c.universe.Tree)(nonNullQuote: => c.universe.Tree): c.universe.Tree = {
+  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nonNullQuote: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
       if ($nullCheckQuote)
-        ${nullQuote}
+        ${nullQuote(c)}
       else
         $nonNullQuote
     """
@@ -136,7 +136,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
       """
 
-    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nullQuote(c))(nonNullQuote)}")
+    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nonNullQuote)}")
   }
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
@@ -160,7 +160,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // string type
       case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
-        stringQuote(c)(objNm)(fieldNm)(nullQuote(c))
+        stringQuote(c)(objNm)(fieldNm)
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>

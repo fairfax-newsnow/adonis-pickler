@@ -45,7 +45,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
         q"""
           def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
-            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nullQuote(c))(nonNullQuote)}
+            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
           }
         """
     }
@@ -65,7 +65,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
     q"""
       def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
-        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "objList"))(nullQuote(c))(nonNullQuote)}
+        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "objList"))(nonNullQuote)}
       }
     """
   }
@@ -118,9 +118,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${TermName(jsonIO)}.makeNumber($numQuote)"
   }
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String)(nullQuote: => c.universe.Tree): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    stringQuoteTemplate(c)(q"")(objNm)(nullQuote)
+    stringQuoteTemplate(c)(q"")(objNm)
   }
 
   def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
@@ -130,7 +130,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def nullQuote(c: Context): c.universe.Tree = {
     import c.universe._
-    q""" ${TermName(jsonIO)}.${TermName("makeNull")} """
+    q""" throw new IllegalArgumentException("The data object has a null attribute") """
   }
 
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
@@ -149,7 +149,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
-    q"${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = objNm))(nullQuote(c))(nonNullQuote)}"
+    q"${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = objNm))(nonNullQuote)}"
   }
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {

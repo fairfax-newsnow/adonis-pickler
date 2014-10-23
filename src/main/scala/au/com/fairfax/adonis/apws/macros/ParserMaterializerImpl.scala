@@ -40,7 +40,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
         q"""
           def ${TermName(methodNm)}(map: J) = {
-            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nullQuote(c))(nonNullQuote)}
+            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
           }
        """
     }
@@ -71,7 +71,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     q"""
       def ${TermName(methodNm)}(array: J) = {
-        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nullQuote(c))(nonNullQuote)}
+        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nonNullQuote)}
       }
     """
   }
@@ -123,12 +123,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       q"${quote}.asInstanceOf[$tpe]"
   }
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String)(nullQuote: => c.universe.Tree): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
     val varBeChecked = concatVarNms(objNm, fieldNm)
     val preQuote = q"val ${TermName(varBeChecked)} = ${fieldQuote(c)(objNm)(fieldNm)}"
-    stringQuoteTemplate(c)(preQuote)(varBeChecked)(nullQuote)
+    stringQuoteTemplate(c)(preQuote)(varBeChecked)
   }
 
   def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
@@ -138,7 +138,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def nullQuote(c: Context): c.universe.Tree = {
     import c.universe._
-    q"null"
+    q""" throw new IllegalArgumentException("The json data contains a null attribute which is not mapped to an Option[_] attribute") """
   }
 
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
@@ -158,7 +158,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val assignedVar = concatVarNms(objNm, fieldNm)
     q"""
       val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nullQuote(c))(nonNullQuote)}
+      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nonNullQuote)}
     """
   }
 
@@ -225,7 +225,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val companion = getCompanion(c)(tpe)
 
     q"""
-      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)(q""" "N/A" """)}
+      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)}
       au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
