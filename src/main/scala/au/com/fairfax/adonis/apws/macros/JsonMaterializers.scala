@@ -20,7 +20,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   val jsonIO: String
 
-  def tpeClassNm(c: Context): c.universe.Type => String = _.typeSymbol.asClass.name.toString
+  def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
 
   def collTypes(c: Context) = {
     import c.universe._
@@ -177,11 +177,21 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val handleMeth = "handleMap"
-        val List(key, value) = t.typeArgs
-        q"""
+        try {
+          val List(key, value) = t.dealias.typeArgs
+          q"""
           ${mapQuote(c)(key)(value)(handleMeth)}
           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
+        } catch {
+          case e: Throwable =>
+            println("TYPE: " + t.dealias)
+            println("Error: " + e)
+            e.printStackTrace()
+            q"""
+          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+        """
+        }
 
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>

@@ -92,8 +92,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val leftTpe = tpe.typeArgs.head
-    val rightTpe = tpe.typeArgs.last
+    val leftTpe = tpe.dealias.typeArgs.head
+    val rightTpe = tpe.dealias.typeArgs.last
     val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
     val simpleRightTpe = simpleTypeNm(rightTpe.toString)
     val leftMeth = itemMethNm(leftTpe.toString)

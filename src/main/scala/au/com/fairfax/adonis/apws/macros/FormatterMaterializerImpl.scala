@@ -89,8 +89,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val leftTpe = tpe.typeArgs.head
-    val rightTpe = tpe.typeArgs.last
+    val leftTpe = tpe.dealias.typeArgs.head
+    val rightTpe = tpe.dealias.typeArgs.last
     val leftFormatMeth = itemMethNm(leftTpe.toString)
     val rightFormatMeth = itemMethNm(rightTpe.toString)
     //caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String)
