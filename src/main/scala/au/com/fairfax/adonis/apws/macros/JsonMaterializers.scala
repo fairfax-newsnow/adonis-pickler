@@ -177,21 +177,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val handleMeth = "handleMap"
-        try {
-          val List(key, value) = t.dealias.typeArgs
-          q"""
-          ${mapQuote(c)(key)(value)(handleMeth)}
-          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+        val List(key, value) = t.dealias.typeArgs
+        q"""
+        ${mapQuote(c)(key)(value)(handleMeth)}
+        ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
         """
-        } catch {
-          case e: Throwable =>
-            println("TYPE: " + t.dealias)
-            println("Error: " + e)
-            e.printStackTrace()
-            q"""
-          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
-        }
 
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
