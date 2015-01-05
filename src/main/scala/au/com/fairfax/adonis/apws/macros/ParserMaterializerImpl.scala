@@ -235,12 +235,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     materializeTemplate(c) {
       tpe =>
         q"""
-          implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[$tpe] {
+          implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
             override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
               def parseJsSerialised(jsSerialised: J) =
                 au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
 
-              ${recurQuote(c)(tpe)("json")("args")(true)}
+              ${recurQuote(c)(tpe.dealias)("json")("args")(true)}
             }
           }
           GenJsonParser
