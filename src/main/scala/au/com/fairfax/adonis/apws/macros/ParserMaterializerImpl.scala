@@ -13,10 +13,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     varNms mkString "_"
 
   // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(methodNm)}(item: ${TypeName("J")}) =
+      def $methodNm(item: ${TypeName("J")}) =
         ${recurQuote(c)(tpe)("item")("")(false)}
     """
   }
@@ -35,7 +35,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
                 val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
                 val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
                 val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
-                ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
+                $keyMeth(key) -> $valMeth(value)
               }.toMap
             """
           }
@@ -168,7 +168,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
-    itemQuote(c)(ct)(method)
+    itemQuote(c)(ct)(c.universe.TermName(method))
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
     import c.universe._

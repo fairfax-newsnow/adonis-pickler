@@ -14,16 +14,16 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${jsonIo(c)}.makeString($s)"
   }
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree =
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree =
     itemQuoteTemplate(c)(tpe)(methodNm) {
       recurQuote(c)(tpe)(_)("")(false)
     }
 
-  private def itemQuoteTemplate(c: Context)(tpe: c.universe.Type)(methodNm: String)(quoteFunc: String => c.universe.Tree): c.universe.Tree = {
+  private def itemQuoteTemplate(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(quoteFunc: String => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val varName = "obj"
     q"""
-      def ${TermName(methodNm)}(${TermName(varName)}: $tpe) =
+      def $methodNm(${TermName(varName)}: $tpe) =
         ${quoteFunc(varName)}
     """
   }
@@ -38,7 +38,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
             val elems =
               map.map { t =>
                 val (k, v) = t
-                ${jsonIo(c)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
+                ${jsonIo(c)}.makeArray($keyMeth(k), $valMeth(v))
               }.toList
             ${jsonIo(c)}.makeArray(elems: _*)
           """

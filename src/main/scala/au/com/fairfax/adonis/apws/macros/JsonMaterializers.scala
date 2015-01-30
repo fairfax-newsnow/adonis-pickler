@@ -41,12 +41,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def numDealisTpeNms(c: Context) =
     List(deliasTpeName[Double](c), deliasTpeName[Float](c), deliasTpeName[Short](c), deliasTpeName[Int](c), deliasTpeName[Long](c))
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
+  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
   def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
-  def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (String, String, List[c.universe.Tree]) => c.universe.Tree) = {
-    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => itemMethNm(t.toString))
+  def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (c.universe.TermName, c.universe.TermName, List[c.universe.Tree]) => c.universe.Tree) = {
+    import c.universe._
+    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => TermName(itemMethNm(t.toString)))
     val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
       if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
       else Nil
