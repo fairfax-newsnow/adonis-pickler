@@ -28,12 +28,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+  def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {    import c.universe._
     import c.universe._
-    mapTemplateQuote(c)(keyTpe)(valTpe) {
-      (keyMeth, valMeth, itemQuotes) =>
-        val nonNullQuote =
-          q"""
+    val (keyTpe, valTpe) = kvTpes
+    val (keyMeth, valMeth) = kvMeths
+    val methodImplQuote =
+      quoteWithNullCheck(c)(varOfNullCheck = "map") {
+        q"""
             ..$itemQuotes
             val elems =
               map.map { t =>
@@ -41,14 +42,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
                 ${jsonIo(c)}.makeArray($keyMeth(k), $valMeth(v))
               }.toList
             ${jsonIo(c)}.makeArray(elems: _*)
-          """
-
-        q"""
-          def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
-            ${quoteWithNullCheck(c)(varOfNullCheck = "map")(nonNullQuote)}
-          }
         """
-    }
+      }
+    q"def $handleMapMeth(map: $keyTpe Map $valTpe) = $methodImplQuote"
   }
 
   def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {

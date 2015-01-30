@@ -43,17 +43,19 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
-  def mapQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(methodNm: String): c.universe.Tree
-
-  def mapTemplateQuote(c: Context)(keyTpe: c.universe.Type)(valTpe: c.universe.Type)(quoteFunc: (c.universe.TermName, c.universe.TermName, List[c.universe.Tree]) => c.universe.Tree) = {
-    import c.universe._
-    val List(keyMeth, valMeth) = List(keyTpe, valTpe) map (t => TermName(itemMethNm(t.toString)))
-    val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
-      if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
-      else Nil
-    }
-    quoteFunc(keyMeth, valMeth, itemQuotes)
-  }
+  /**
+   * Quote for method definition that handle a map, it will be soemthing like
+   * q"""
+   *   def handleMap(...) = {...}
+   * """
+   * @param c
+   * @param handleMapMeth
+   * @param kvTpes
+   * @param kvMeths
+   * @param itemQuotes
+   * @return
+   */
+  def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
   def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
     import c.universe._
@@ -207,11 +209,18 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
-        val handleMeth = "handleMap"
-        val List(key, value) = t.dealias.typeArgs
+        val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
+          t => (t, TermName(itemMethNm(t.toString)))
+        }.unzip
+        val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
+          if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
+          else Nil
+        }
+        val methName = TermName("handleMap")
+        val defMethQuote = handleMapQuote(c)(methName)((keyTpe, valTpe))((keyMeth, valMeth))(itemQuotes)
         q"""
-        ${mapQuote(c)(key)(value)(handleMeth)}
-        ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
+          $defMethQuote
+          $methName(${fieldQuote(c)(objNm)(fieldNm)})
         """
 
       // an option type
