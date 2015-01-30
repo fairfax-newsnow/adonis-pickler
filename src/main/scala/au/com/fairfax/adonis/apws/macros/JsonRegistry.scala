@@ -40,9 +40,7 @@ class BaseJsonRegistry extends JsonRegistry {
   private def className[T: ClassTag] = implicitly[ClassTag[T]].runtimeClass.getName
 
 
-  private def toMapKey(s: String): String = strReplacement.foldLeft(s) {
-    (z, x) => if (z == x._1) x._2 else z
-  }.replace('$', '.')
+  private def toMapKey(s: String): String = strReplacement.getOrElse(s, s).replace('$', '.')
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
@@ -52,25 +50,17 @@ class BaseJsonRegistry extends JsonRegistry {
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
-    formatters.get(if (key == "T") toMapKey(className[T]) else key) match {
-      case Some(formatter) =>
-        formatter format obj
-
-      case None =>
-        throw new Error(s"No formatter exists for $key")
-    }
+    formatters.get(if (key == "T") toMapKey(className[T]) else key).fold {
+      throw new Error(s"No formatter exists for $key")
+    } {_ format obj}
   }
 
   override def parse[J](json: J)(implicit reader: JReader[J]): Any = {
     val cmdType = reader.readString(reader.readObjectField(json, "t"))
     val key = toMapKey(cmdType)
-    parsers.get(key) match {
-      case Some(parser) =>
-        parser parse json
-
-      case None =>
-        throw new Error(s"No parser exists for $key")
-    }
+    parsers.get(key).fold {
+      throw new Error(s"No parser exists for $key")
+    } {_ parse json}
   }
 
 }
