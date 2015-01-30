@@ -74,26 +74,50 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String): c.universe.Tree = {
+  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varOfNullCheck: String): c.universe.Tree = {
     import c.universe._
-    val nonNullQuote = q"${jsonIo(c)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
     q"""
       $preQuote
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nonNullQuote)}
+      ${
+        quoteWithNullCheck(c)(varOfNullCheck) {
+          q"${jsonIo(c)}.${TermName(ioActionString + "String")}(${TermName(varOfNullCheck)})"
+        }
+      }
     """
   }
 
-  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree
+  /**
+   * The quote for checking if varOfNullCheck is null, materializer implementation specific.
+   *
+   * @param c
+   * @param varOfNullCheck
+   * @return
+   */
+  def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree
 
-  def nullQuote(c: Context): c.universe.Tree
+  /**
+   * The quote for the condition when the involved variable is null, materializer implementation specific.
+   *
+   * @param c
+   * @return
+   */
+  def quoteForNullVar(c: Context): c.universe.Tree
 
-  def nullHandlerTemplate(c: Context)(nullCheckQuote: c.universe.Tree)(nonNullQuote: => c.universe.Tree): c.universe.Tree = {
+  /**
+   * A func template that creates a quote to do null check on a var, and executes correspondingly upon different condition.
+   *
+   * @param c
+   * @param varOfNullCheck
+   * @param quoteForNonNullVar
+   * @return
+   */
+  def quoteWithNullCheck(c: Context)(varOfNullCheck: String)(quoteForNonNullVar: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      if ($nullCheckQuote)
-        ${nullQuote(c)}
+      if (${ quoteForNullCheck(c)(TermName(varOfNullCheck)) })
+        ${quoteForNullVar(c)}
       else
-        $nonNullQuote
+        $quoteForNonNullVar
     """
   }
 
@@ -142,7 +166,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
       """
 
-    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${nullHandlerTemplate(c)(nullCheckQuote(c)(objNm))(nonNullQuote)}")
+    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}")
   }
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree

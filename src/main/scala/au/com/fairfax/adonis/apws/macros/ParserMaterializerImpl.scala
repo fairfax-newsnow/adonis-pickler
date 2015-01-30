@@ -26,8 +26,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     mapTemplateQuote(c)(keyTpe)(valTpe) {
       (keyMeth, valMeth, itemQuotes) =>
-        val nonNullQuote =
-          q"""
+        val methodImplQuote =
+          quoteWithNullCheck(c)(varOfNullCheck = "map") {
+            q"""
               ..$itemQuotes
               val mapSize = ${jsonIo(c)}.readArrayLength(map)
               (0 until mapSize).toList.map { idx =>
@@ -36,13 +37,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
                 val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
                 ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
               }.toMap
-          """
-
-        q"""
-          def ${TermName(methodNm)}(map: J) = {
-            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
+            """
           }
-       """
+
+        q"def ${TermName(methodNm)}(map: J) = $methodImplQuote"
     }
   }
 
@@ -71,7 +69,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     q"""
       def ${TermName(methodNm)}(array: J) = {
-        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "array"))(nonNullQuote)}
+        ${quoteWithNullCheck(c)(varOfNullCheck = "array")(nonNullQuote)}
       }
     """
   }
@@ -131,12 +129,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     stringQuoteTemplate(c)(preQuote)(varBeChecked)
   }
 
-  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
+  def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"${jsonIo(c)}.${TermName("isNull")}(${TermName(varBeChecked)})"
+    q"${jsonIo(c)}.${TermName("isNull")}($varOfNullCheck)"
   }
 
-  def nullQuote(c: Context): c.universe.Tree = {
+  def quoteForNullVar(c: Context): c.universe.Tree = {
     import c.universe._
     q""" throw new IllegalArgumentException("The json data contains a null attribute which is not mapped to an Option[_] attribute") """
   }
@@ -158,7 +156,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val assignedVar = concatVarNms(objNm, fieldNm)
     q"""
       val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
-      ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = assignedVar))(nonNullQuote)}
+      ${quoteWithNullCheck(c)(varOfNullCheck = assignedVar)(nonNullQuote)}
     """
   }
 

@@ -45,7 +45,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
         q"""
           def ${TermName(methodNm)}(map: $keyTpe Map $valTpe) = {
-            ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "map"))(nonNullQuote)}
+            ${quoteWithNullCheck(c)(varOfNullCheck = "map")(nonNullQuote)}
           }
         """
     }
@@ -65,7 +65,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
     q"""
       def ${TermName(methodNm)}(objList: ${TypeName(collType)}[$tpe]) = {
-        ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = "objList"))(nonNullQuote)}
+        ${quoteWithNullCheck(c)(varOfNullCheck = "objList")(nonNullQuote)}
       }
     """
   }
@@ -123,12 +123,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     stringQuoteTemplate(c)(q"")(objNm)
   }
 
-  def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
+  def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"${TermName(varBeChecked)} == null"
+    q"$varOfNullCheck == null"
   }
 
-  def nullQuote(c: Context): c.universe.Tree = {
+  def quoteForNullVar(c: Context): c.universe.Tree = {
     import c.universe._
     q""" throw new IllegalArgumentException("The data object has a null attribute") """
   }
@@ -149,7 +149,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
-    q"${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = objNm))(nonNullQuote)}"
+    q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}"
   }
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
