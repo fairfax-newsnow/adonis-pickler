@@ -18,7 +18,15 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   import Materializer._
 
-  val jsonIO: String
+  /**
+   * @return "reader" if this is parser, o.w. "builder"
+   */
+  def jsonIo(c: Context): c.universe.TermName
+
+  /**
+   * @return "read" if this is parser, o.w. "make"
+   */
+  def ioActionString: String
 
   def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
 
@@ -68,7 +76,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varBeChecked: String): c.universe.Tree = {
     import c.universe._
-    val nonNullQuote = q"${TermName(jsonIO)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
+    val nonNullQuote = q"${jsonIo(c)}.${TermName(ioActionString + "String")}(${TermName(varBeChecked)})"
     q"""
       $preQuote
       ${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked))(nonNullQuote)}
@@ -90,8 +98,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   }
 
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
-
-  def ioActionString: String
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
 
@@ -164,7 +170,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
-        q"${TermName(jsonIO)}.${TermName(ioActionString + "Boolean")}(${fieldQuote(c)(objNm)(fieldNm)})"
+        q"${jsonIo(c)}.${TermName(ioActionString + "Boolean")}(${fieldQuote(c)(objNm)(fieldNm)})"
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
@@ -225,13 +231,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     }
   }
 
-  def materializeTemplate[T: c.WeakTypeTag](c: Context)(quoteFunc: c.universe.Type => c.universe.Tree): c.Expr[FP[T]] = {
-    import c.universe._
-    val tpe = weakTypeOf[T]
-    val result = quoteFunc(tpe)
-//    println(result)
-    c.Expr[FP[T]](result)
-  }
 }
 
 trait ParserMaterializer {

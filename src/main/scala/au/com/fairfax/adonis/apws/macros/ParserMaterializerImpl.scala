@@ -5,7 +5,7 @@ import Materializer._
 import au.com.fairfax.adonis.utils.simpleTypeNm
 
 object ParserMaterializerImpl extends Materializer[JsonParser] {
-  lazy val jsonIO: String = "reader"
+  def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
   lazy val ioActionString: String = "read"
 
@@ -29,11 +29,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
         val nonNullQuote =
           q"""
               ..$itemQuotes
-              val mapSize = ${TermName(jsonIO)}.readArrayLength(map)
+              val mapSize = ${jsonIo(c)}.readArrayLength(map)
               (0 until mapSize).toList.map { idx =>
-                val tuple = ${TermName(jsonIO)}.readArrayElem(map, idx)
-                val key = ${TermName(jsonIO)}.readArrayElem(tuple, 0)
-                val value = ${TermName(jsonIO)}.readArrayElem(tuple, 1)
+                val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
+                val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
+                val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
                 ${TermName(keyMeth)}(key) -> ${TermName(valMeth)}(value)
               }.toMap
           """
@@ -52,7 +52,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
-            idx => ${TermName(createMeth)}(${TermName(jsonIO)}.readArrayElem(array, idx))
+            idx => ${TermName(createMeth)}(${jsonIo(c)}.readArrayElem(array, idx))
           }
       """
 
@@ -65,7 +65,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val nonNullQuote =
       q"""
         ${itemQuote(c)(tpe)(createMeth)}
-        val arraySize = ${TermName(jsonIO)}.readArrayLength(array)
+        val arraySize = ${jsonIo(c)}.readArrayLength(array)
         $toCollQuote
       """
 
@@ -82,7 +82,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"""
       def ${TermName(methodNm)}(json: J): Option[$tpe] = {
         ${itemQuote(c)(tpe)(createMeth)}
-        if (${TermName(jsonIO)}.isNull(json))
+        if (${jsonIo(c)}.isNull(json))
           None
         else
           Some(${TermName(createMeth)}(json))
@@ -103,8 +103,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       def ${TermName(methodNm)}(json: J): Either[$leftTpe, $rightTpe] = {
         ${caseClassItemQuote(c)(leftMeth)(leftTpe)("")}
         ${caseClassItemQuote(c)(rightMeth)(rightTpe)("")}
-        val value = ${TermName(jsonIO)}.readObjectField(json, "v")
-        val providedTypeName = ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(json, "t"))
+        val value = ${jsonIo(c)}.readObjectField(json, "v")
+        val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
         providedTypeName match {
           case $simpleLeftTpe => Left(${TermName(leftMeth)}(value))
           case $simpleRightTpe => Right(${TermName(rightMeth)}(value))
@@ -116,7 +116,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val quote = q"${TermName(jsonIO)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
+    val quote = q"${jsonIo(c)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
     if (tpe == typeOf[Double])
       quote
     else
@@ -133,7 +133,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def nullCheckQuote(c: Context)(varBeChecked: String): c.universe.Tree = {
     import c.universe._
-    q"${TermName(jsonIO)}.${TermName("isNull")}(${TermName(varBeChecked)})"
+    q"${jsonIo(c)}.${TermName("isNull")}(${TermName(varBeChecked)})"
   }
 
   def nullQuote(c: Context): c.universe.Tree = {
@@ -146,7 +146,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     if (fieldNm == "")
       q"${TermName(objNm)}"
     else
-      q"${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, $fieldNm)"
+      q"${jsonIo(c)}.readObjectField(${TermName(objNm)}, $fieldNm)"
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
@@ -174,7 +174,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
     import c.universe._
-    q"""${TermName(method)}(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "v"))"""
+    q"""${TermName(method)}(${jsonIo(c)}.readObjectField(${TermName(objNm)}, "v"))"""
   }
 
   def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
@@ -186,13 +186,13 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     import c.universe._
     if (onlyCaseObjects)
       q"""
-        ${TermName(jsonIO)}.readString(${TermName(objNm)}) match {
+        ${jsonIo(c)}.readString(${TermName(objNm)}) match {
           case ..$ptnToHandlerQuotes
         }
       """
     else
       q"""
-        ${TermName(jsonIO)}.readString(${TermName(jsonIO)}.readObjectField(${TermName(objNm)}, "t")) match {
+        ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(${TermName(objNm)}, "t")) match {
           case ..$ptnToHandlerQuotes
         }
       """
@@ -232,11 +232,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
-    materializeTemplate(c) {
-      tpe =>
+    val tpe = weakTypeOf[T]
+    val result =
         q"""
           implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
-            override def parse[J](json: J)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
+            override def parse[J](json: J)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
               def parseJsSerialised(jsSerialised: J) =
                 au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
 
@@ -245,6 +245,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           }
           GenJsonParser
         """
-    }
+    c.Expr[JsonParser[T]](result)
   }
 }

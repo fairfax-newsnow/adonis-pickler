@@ -5,13 +5,13 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 import Materializer._
 
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
-  lazy val jsonIO: String = "builder"
+  def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
   lazy val ioActionString: String = "make"
 
   private def toJsonStringQuote(c: Context)(s: String): c.universe.Tree = {
     import c.universe._
-    q"${TermName(jsonIO)}.makeString($s)"
+    q"${jsonIo(c)}.makeString($s)"
   }
 
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree =
@@ -38,9 +38,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
             val elems =
               map.map { t =>
                 val (k, v) = t
-                ${TermName(jsonIO)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
+                ${jsonIo(c)}.makeArray(${TermName(keyMeth)}(k), ${TermName(valMeth)}(v))
               }.toList
-            ${TermName(jsonIO)}.makeArray(elems: _*)
+            ${jsonIo(c)}.makeArray(elems: _*)
           """
 
         q"""
@@ -60,7 +60,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
         val jsonList = objList.map {
           obj => ${TermName(formatMeth)}(obj)
         }
-        ${TermName(jsonIO)}.makeArray(jsonList: _*)
+        ${jsonIo(c)}.makeArray(jsonList: _*)
       """
 
     q"""
@@ -75,7 +75,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val formatMeth = itemMethNm(tpe.toString)
     val caseQuotes = List(
       cq"Some(v) => ${TermName(formatMeth)}(v)",
-      cq"None => ${TermName(jsonIO)}.makeNull()")
+      cq"None => ${jsonIo(c)}.makeNull()")
 
     q"""
       def ${TermName(methodNm)}(opt: Option[$tpe]) = {
@@ -115,7 +115,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val numQuote =
       if (tpe == typeOf[Double]) q"${TermName(objNm)}"
       else q"${TermName(objNm)}.asInstanceOf[Double]"
-    q"${TermName(jsonIO)}.makeNumber($numQuote)"
+    q"${jsonIo(c)}.makeNumber($numQuote)"
   }
 
   def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
@@ -148,7 +148,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
-    val nonNullQuote = q"${TermName(jsonIO)}.makeObject(..$accessorQuotes)"
+    val nonNullQuote = q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
     q"${nullHandlerTemplate(c)(nullCheckQuote(c)(varBeChecked = objNm))(nonNullQuote)}"
   }
 
@@ -159,7 +159,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       if (areSiblingCaseObjs)
         toJsonStringQuote(c)(typeName)
       else
-        q"""${TermName(jsonIO)}.makeObject("t" -> ${toJsonStringQuote(c)(typeName)}, "v" -> ${toJsonStringQuote(c)("")})"""
+        q"""${jsonIo(c)}.makeObject("t" -> ${toJsonStringQuote(c)(typeName)}, "v" -> ${toJsonStringQuote(c)("")})"""
     q"""
       def ${TermName(methodNm)} =
         $buildQuote
@@ -216,26 +216,26 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"""
-      ${TermName(jsonIO)}.makeString(${TermName(objNm)}.toString)
+      ${jsonIo(c)}.makeString(${TermName(objNm)}.toString)
     """
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
-    materializeTemplate(c) {
-      tpe =>
+    val tpe = weakTypeOf[T]
+    val result =
         q"""
           implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
-            override def format[J](obj: Any)(implicit ${TermName(jsonIO)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+            override def format[J](obj: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
               val typedObj = obj.asInstanceOf[$tpe]
-              ${TermName(jsonIO)}.makeObject(
-                "t" -> ${TermName(jsonIO)}.makeString(${tpe.toString}),
+              ${jsonIo(c)}.makeObject(
+                "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
                 "args" -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
               )
             }
           }
           GenJsonFormatter
         """
-    }
+    c.Expr[JsonFormatter[T]](result)
   }
 }
