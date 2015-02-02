@@ -39,7 +39,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
   /**
-   * Quote for method definition that handle a map, it will be soemthing like
+   * Quote for a method definition that handle a map, it will be something like
    * def handleMap(...) = {...}
    */
   def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
@@ -60,8 +60,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree
 
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+  /**
+   * Quote for handling a numeric value
+   */
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
+  /**
+   * Quote for handling a boolean value
+   */
   def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   /**

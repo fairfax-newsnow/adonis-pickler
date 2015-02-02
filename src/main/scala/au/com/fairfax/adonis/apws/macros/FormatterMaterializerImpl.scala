@@ -104,17 +104,25 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote for formatting a numeric value, it will be something like, e.g.
+   * builder.makeNumber(
+   *   objNm
+   * )
+   *
+   * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
+   */
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val numQuote =
-      if (tpe == typeOf[Double]) q"${TermName(objNm)}"
-      else q"${TermName(objNm)}.asInstanceOf[Double]"
+      if (tpe == typeOf[Double]) q"$objNm"
+      else q"$objNm.asInstanceOf[Double]"
     q"${jsonIo(c)}.makeNumber($numQuote)"
   }
 
   /**
    * Quote for formatting a string value, it will be something like, e.g.
-   * if (reader.isNull(objNm)) {
+   * if (objNm == null) {
    *   throw new IllegalArgumentException
    * } else {
    *  builder.makeString(objNm)
@@ -131,6 +139,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  /**
+   * Quote for formatting a boolean value, it will be something like, e.g.
+   * builder.makeBoolean(objNm)
+   *
+   * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
+   */
   def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.makeBoolean(${fieldQuote(c)(objNm)(fieldNm)})"

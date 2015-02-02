@@ -106,7 +106,15 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote for parsing a numeric value, it will be something like
+   * reader.readNumber(
+   *   reader.readObjectField(objNm, fieldNm)
+   * )
+   *
+   * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
+   */
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     val quote = q"${jsonIo(c)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
     if (tpe == typeOf[Double])
@@ -137,6 +145,13 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
+  /**
+   * Quote for parsing a boolean value, it will be something like, e.g.
+   * val objNm_fieldNm = reader.readObjectField(objNm, fieldNm)
+   * reader.readBoolean(objNm_fieldNm)
+   *
+   * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
+   */
   def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.readBoolean(${fieldQuote(c)(objNm)(fieldNm)})"
