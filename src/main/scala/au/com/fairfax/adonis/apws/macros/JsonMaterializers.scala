@@ -9,7 +9,7 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 import au.com.fairfax.adonis.apws.types.Enum
 
 object Materializer {
-  def methdOfHandleItemTpe(typeName: String): String =
+  def methdNameOfHandleItem(typeName: String): String =
     ("handle" :: List(typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.")).mkString("_")
 
 }
@@ -58,7 +58,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree
 
-  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
+  /**
+   * Quote to handle an option
+   */
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree
 
   def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree
 
@@ -133,7 +136,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
       ct =>
         val pattern = simpleTypeNm(ct.toString)
-        val method = methdOfHandleItemTpe(pattern)
+        val method = methdNameOfHandleItem(pattern)
         val (iQuote, handlerQuote) =
           if (hasNoAccessor(c)(ct))
             (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
@@ -191,7 +194,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
-          t => (t, methdOfHandleItemTpe(t.toString))
+          t => (t, methdNameOfHandleItem(t.toString))
         }.unzip
         val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
           if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
@@ -201,11 +204,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
-        val handleMeth = "handleOption"
-        q"""
-          ${optionQuote(c)(t.typeArgs.head)(handleMeth)}
-          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        optionQuote(c)(objNm)(fieldNm)(t.typeArgs.head)
 
       // an either type
       case t: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(t) =>
@@ -217,7 +216,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val handleMeth = methdOfHandleItemTpe(t.toString + "_traitFamily")
+        val handleMeth = methdNameOfHandleItem(t.toString + "_traitFamily")
         q"""
           ${sealedTraitQuote(c)(t)(objNm)(fieldNm)(handleMeth)}
           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})

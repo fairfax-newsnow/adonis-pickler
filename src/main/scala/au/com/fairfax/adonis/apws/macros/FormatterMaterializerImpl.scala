@@ -62,7 +62,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val formatItemMeth = TermName(methdOfHandleItemTpe(itemTpe.toString))
+    val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
 
     val formatCollMethImpl =
       quoteWithNullCheck(c)(varOfNullCheck = "objList") {
@@ -82,20 +82,27 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+  /**
+   * Quote to format an option, it will be something like
+   * def formatOption(opt: Option[ITEM]) = ???
+   * formatOption(objNm)
+   */
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val formatMeth = methdOfHandleItemTpe(tpe.toString)
+    val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val caseQuotes = List(
-      cq"Some(v) => ${TermName(formatMeth)}(v)",
+      cq"Some(v) => $formatItemMeth(v)",
       cq"None => ${jsonIo(c)}.makeNull()")
 
+    val formatOptionMethNm = TermName("formatOption")
     q"""
-      def ${TermName(methodNm)}(opt: Option[$tpe]) = {
-        ${itemQuote(c)(tpe)(formatMeth)}
+      def $formatOptionMethNm(opt: Option[$itemTpe]) = {
+        ${itemQuote(c)(itemTpe)(formatItemMeth)}
         opt match {
           case ..$caseQuotes
         }
       }
+      $formatOptionMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
@@ -103,8 +110,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
-    val leftFormatMeth = methdOfHandleItemTpe(leftTpe.toString)
-    val rightFormatMeth = methdOfHandleItemTpe(rightTpe.toString)
+    val leftFormatMeth = methdNameOfHandleItem(leftTpe.toString)
+    val rightFormatMeth = methdNameOfHandleItem(rightTpe.toString)
     //caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String)
     val caseQuotes = List(
       cq"""Left(v) => ${TermName(leftFormatMeth)}(v)""",

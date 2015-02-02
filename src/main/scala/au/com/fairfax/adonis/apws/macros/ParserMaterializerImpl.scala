@@ -55,7 +55,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val parseItemMeth = TermName(methdOfHandleItemTpe(itemTpe.toString))
+    val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
@@ -86,17 +86,27 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
+  /**
+   * Quote to parse an option, it will be something like
+   * def parseOption(json: J): Option[ITEM] = ???
+   * parseOption(reader.readObjectField(objNm, s"$fieldNm"))
+   */
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val createMeth = methdOfHandleItemTpe(tpe.toString)
-    q"""
-      def ${TermName(methodNm)}(json: J): Option[$tpe] = {
-        ${itemQuote(c)(tpe)(createMeth)}
+    val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
+    val parseOptionMethImpl =
+      q"""
+        ${itemQuote(c)(itemTpe)(parseItemMeth)}
         if (${jsonIo(c)}.isNull(json))
           None
         else
-          Some(${TermName(createMeth)}(json))
-      }
+          Some($parseItemMeth(json))
+      """
+    
+    val parseOptionMethdNm = TermName("parseOption")
+    q"""
+      def $parseOptionMethdNm(json: J): Option[$itemTpe] = $parseOptionMethImpl
+      $parseOptionMethdNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
@@ -106,8 +116,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val rightTpe = tpe.dealias.typeArgs.last
     val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
     val simpleRightTpe = simpleTypeNm(rightTpe.toString)
-    val leftMeth = methdOfHandleItemTpe(leftTpe.toString)
-    val rightMeth = methdOfHandleItemTpe(rightTpe.toString)
+    val leftMeth = methdNameOfHandleItem(leftTpe.toString)
+    val rightMeth = methdNameOfHandleItem(rightTpe.toString)
 
     q"""
       def ${TermName(methodNm)}(json: J): Either[$leftTpe, $rightTpe] = {
