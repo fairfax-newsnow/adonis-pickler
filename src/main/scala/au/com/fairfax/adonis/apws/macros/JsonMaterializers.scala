@@ -61,17 +61,17 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree
 
   /**
-   * Quote for handling a numeric value
+   * Quote to handle a numeric value
    */
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   /**
-   * Quote for handling a boolean value
+   * Quote to handle a boolean value
    */
   def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   /**
-   * Quote for handling a string value
+   * Quote to handle a string value
    */
   def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
@@ -99,7 +99,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   }
 
   /**
-   * Quote that handles the field on that object
+   * Quote to handle fieldNm on objNm
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
@@ -151,13 +151,17 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+  /**
+   * Quote to handle an enum object
+   */
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(firstRun: Boolean): c.universe.Tree = {
     import c.universe._
     val jsSerialisable: c.universe.Type = c.mirror.typeOf[JsSerialisable]
 
     tpe match {
+      // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         enumObjQuote(c)(t)(objNm)(fieldNm)
 

@@ -107,9 +107,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote for parsing a numeric value, it will be something like
+   * Quote to parse a numeric value, it will be something like
    * reader.readNumber(
-   *   reader.readObjectField(objNm, fieldNm)
+   *   reader.readObjectField(objNm, s"$fieldNm")
    * )
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
@@ -124,8 +124,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote for parsing a string value, it will be something like, e.g.
-   * val objNm_fieldNm = reader.readObjectField(objNm, fieldNm)
+   * Quote to parse a string value, it will be something like, e.g.
+   * val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
    * if (reader.isNull(objNm_fieldNm)) {
    *   throw new IllegalArgumentException
    * } else {
@@ -146,8 +146,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote for parsing a boolean value, it will be something like, e.g.
-   * val objNm_fieldNm = reader.readObjectField(objNm, fieldNm)
+   * Quote to parse a boolean value, it will be something like, e.g.
+   * val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
    * reader.readBoolean(objNm_fieldNm)
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
@@ -170,7 +170,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   /**
    * Quote that reads the field on that object.
    * if the field name is "", objNm is the field, return objNm
-   * o.w. return reader.readObjectField(objNm, fieldNm)
+   * o.w. return reader.readObjectField(objNm, s"$fieldNm")
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
@@ -243,17 +243,27 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
   }
 
-  def getCompanion(c: Context)(tpe: c.Type) = {
+  /**
+   * Quote to parse an enum object, it should be something like, e.g.
+   * val caseEnumName = {
+   *   val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
+   *   if (reader.isNull(objNm_fieldNm)) {
+   *     throw new IllegalArgumentException
+   *   } else {
+   *    reader.readString(objNm_fieldNm)
+   *   }
+   * }
+   * au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum(values.this.StoryStatus.Value, caseEnumName)
+   */
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    val symTab = c.universe.asInstanceOf[reflect.internal.SymbolTable]
-    val pre = tpe.asInstanceOf[symTab.Type].prefix.asInstanceOf[Type]
-    c.universe.treeBuild.mkAttributedRef(pre, tpe.typeSymbol.companionSymbol)
-  }
 
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
-    import c.universe._
-
-    val companion = getCompanion(c)(tpe)
+    val companion = {
+      import c.universe._
+      val symTab = c.universe.asInstanceOf[reflect.internal.SymbolTable]
+      val pre = tpe.asInstanceOf[symTab.Type].prefix.asInstanceOf[Type]
+      c.universe.treeBuild.mkAttributedRef(pre, tpe.typeSymbol.companionSymbol)
+    }
 
     q"""
       val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)}

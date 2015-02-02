@@ -106,9 +106,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote for formatting a numeric value, it will be something like, e.g.
-   * builder.makeNumber(
-   *   objNm
-   * )
+   * builder.makeNumber(objNm)
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
    */
@@ -244,11 +242,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
   }
 
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote to format an enum object, it should be something like
+   * builder.makeString(objNm.toString)
+   */
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    q"""
-      ${jsonIo(c)}.makeString(${TermName(objNm)}.toString)
-    """
+    q"${jsonIo(c)}.makeString($objNm.toString)"
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
