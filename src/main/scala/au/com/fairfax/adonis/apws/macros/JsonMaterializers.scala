@@ -45,15 +45,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   /**
    * Quote for method definition that handle a map, it will be soemthing like
-   * q"""
-   *   def handleMap(...) = {...}
-   * """
-   * @param c
-   * @param handleMapMeth
-   * @param kvTpes
-   * @param kvMeths
-   * @param itemQuotes
-   * @return
+   * def handleMap(...) = {...}
    */
   def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
@@ -77,53 +69,44 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varOfNullCheck: String): c.universe.Tree = {
+  final def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
       $preQuote
       ${
         quoteWithNullCheck(c)(varOfNullCheck) {
-          q"${jsonIo(c)}.${TermName(ioActionString + "String")}(${TermName(varOfNullCheck)})"
+          q"${jsonIo(c)}.${TermName(ioActionString + "String")}($varOfNullCheck)"
         }
       }
     """
   }
 
   /**
-   * The quote for checking if varOfNullCheck is null, materializer implementation specific.
-   *
-   * @param c
-   * @param varOfNullCheck
-   * @return
+   * The quote for checking if varOfNullCheck is null.
    */
   def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree
 
   /**
-   * The quote for the condition when the involved variable is null, materializer implementation specific.
-   *
-   * @param c
-   * @return
+   * The quote for the condition when the involved variable is null.
    */
   def quoteForNullVar(c: Context): c.universe.Tree
 
   /**
    * A func template that creates a quote to do null check on a var, and executes correspondingly upon different condition.
-   *
-   * @param c
-   * @param varOfNullCheck
-   * @param quoteForNonNullVar
-   * @return
    */
-  def quoteWithNullCheck(c: Context)(varOfNullCheck: String)(quoteForNonNullVar: => c.universe.Tree): c.universe.Tree = {
+  def quoteWithNullCheck(c: Context)(varOfNullCheck: c.universe.TermName)(quoteForNonNullVar: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      if (${ quoteForNullCheck(c)(TermName(varOfNullCheck)) })
+      if (${ quoteForNullCheck(c)(varOfNullCheck) })
         ${quoteForNullVar(c)}
       else
         $quoteForNonNullVar
     """
   }
 
+  /**
+   * Quote that handles the field on that object
+   */
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
@@ -210,7 +193,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
-          t => (t, TermName(itemMethNm(t.toString)))
+          t => (t, itemMethNm(t.toString))
         }.unzip
         val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
           if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))

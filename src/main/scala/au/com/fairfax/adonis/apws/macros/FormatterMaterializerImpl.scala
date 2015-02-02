@@ -129,6 +129,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q""" throw new IllegalArgumentException("The data object has a null attribute") """
   }
 
+  /**
+   * Quote that format the field on that object.
+   * return objNm
+   */
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     q"${TermName(objNm)}"

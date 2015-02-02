@@ -120,8 +120,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    val varBeChecked = concatVarNms(objNm, fieldNm)
-    val preQuote = q"val ${TermName(varBeChecked)} = ${fieldQuote(c)(objNm)(fieldNm)}"
+    val varBeChecked = TermName(concatVarNms(objNm, fieldNm))
+    val preQuote = q"val $varBeChecked = ${fieldQuote(c)(objNm)(fieldNm)}"
     stringQuoteTemplate(c)(preQuote)(varBeChecked)
   }
 
@@ -135,6 +135,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q""" throw new IllegalArgumentException("The json data contains a null attribute which is not mapped to an Option[_] attribute") """
   }
 
+  /**
+   * Quote that reads the field on that object.
+   * if the field name is "", return fieldNm
+   * o.w. return reader.readObjectField(objNm, fieldNm)
+   */
   def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     if (fieldNm == "")
