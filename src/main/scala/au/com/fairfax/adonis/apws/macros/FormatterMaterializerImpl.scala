@@ -7,8 +7,6 @@ import Materializer._
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
-  lazy val ioAction: String = "make"
-
   private def toJsonStringQuote(c: Context)(s: String): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.makeString($s)"
@@ -114,9 +112,28 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${jsonIo(c)}.makeNumber($numQuote)"
   }
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote for formatting a string value, it will be something like, e.g.
+   * if (reader.isNull(objNm)) {
+   *   throw new IllegalArgumentException
+   * } else {
+   *  builder.makeString(objNm)
+   * }
+   */
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    stringQuoteTemplate(c)(q"")(objNm)
+    q"""
+      ${
+        quoteWithNullCheck(c)(objNm) {
+          q"${jsonIo(c)}.makeString($objNm)"
+        }
+      }
+    """
+  }
+
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"${jsonIo(c)}.makeBoolean(${fieldQuote(c)(objNm)(fieldNm)})"
   }
 
   def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
@@ -133,9 +150,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * Quote that format the field on that object.
    * return objNm
    */
-  def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
-    q"${TermName(objNm)}"
+    q"$objNm"
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree = {

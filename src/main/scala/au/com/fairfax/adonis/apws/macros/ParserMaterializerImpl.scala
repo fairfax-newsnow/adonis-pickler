@@ -7,8 +7,6 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
-  lazy val ioAction: String = "read"
-
   def concatVarNms(varNms: String*): String =
     varNms mkString "_"
 
@@ -117,12 +115,31 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       q"${quote}.asInstanceOf[$tpe]"
   }
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote for parsing a string value, it will be something like, e.g.
+   * val objNm_fieldNm = reader.readObjectField(objNm, fieldNm)
+   * if (reader.isNull(objNm_fieldNm)) {
+   *   throw new IllegalArgumentException
+   * } else {
+   *  reader.readString(objNm_fieldNm)
+   * }
+   */
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
+    val varBeChecked = TermName(concatVarNms(objNm.toString, fieldNm))
+    q"""
+      val $varBeChecked = ${fieldQuote(c)(objNm)(fieldNm)}
+      ${
+        quoteWithNullCheck(c)(varBeChecked) {
+          q"${jsonIo(c)}.readString($varBeChecked)"
+        }
+      }
+    """
+  }
 
-    val varBeChecked = TermName(concatVarNms(objNm, fieldNm))
-    val preQuote = q"val $varBeChecked = ${fieldQuote(c)(objNm)(fieldNm)}"
-    stringQuoteTemplate(c)(preQuote)(varBeChecked)
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"${jsonIo(c)}.readBoolean(${fieldQuote(c)(objNm)(fieldNm)})"
   }
 
   def quoteForNullCheck(c: Context)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
@@ -137,15 +154,15 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote that reads the field on that object.
-   * if the field name is "", return fieldNm
+   * if the field name is "", objNm is the field, return objNm
    * o.w. return reader.readObjectField(objNm, fieldNm)
    */
-  def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     if (fieldNm == "")
-      q"${TermName(objNm)}"
+      q"$objNm"
     else
-      q"${jsonIo(c)}.readObjectField(${TermName(objNm)}, $fieldNm)"
+      q"${jsonIo(c)}.readObjectField($objNm, $fieldNm)"
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =

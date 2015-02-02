@@ -23,15 +23,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def jsonIo(c: Context): c.universe.TermName
 
-  /**
-   * @return "read" if this is parser, o.w. "make"
-   */
-  def ioAction: String
-  
-  def ioString(c: Context): c.universe.TermName = c.universe.TermName(ioAction + "String")
-
-  def ioBoolean(c: Context): c.universe.TermName = c.universe.TermName(ioAction + "Boolean")
-
   def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
 
   def collTypes(c: Context) = {
@@ -71,19 +62,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
-  def stringQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
-  final def stringQuoteTemplate(c: Context)(preQuote: c.universe.Tree)(varOfNullCheck: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"""
-      $preQuote
-      ${
-        quoteWithNullCheck(c)(varOfNullCheck) {
-          q"${jsonIo(c)}.${ioString(c)}($varOfNullCheck)"
-        }
-      }
-    """
-  }
+  /**
+   * Quote for handling a string value
+   */
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   /**
    * The quote for checking if varOfNullCheck is null.
@@ -111,7 +95,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote that handles the field on that object
    */
-  def fieldQuote(c: Context)(objNm: String)(fieldNm: String): c.universe.Tree
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
 
@@ -184,7 +168,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
-        q"${jsonIo(c)}.${ioBoolean(c)}(${fieldQuote(c)(objNm)(fieldNm)})"
+        booleanQuote(c)(objNm)(fieldNm)
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
