@@ -9,7 +9,7 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 import au.com.fairfax.adonis.apws.types.Enum
 
 object Materializer {
-  def itemMethNm(typeName: String): String =
+  def methdOfHandleItemTpe(typeName: String): String =
     ("handle" :: List(typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.")).mkString("_")
 
 }
@@ -39,10 +39,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
   /**
-   * Quote for a method definition that handle a map, it will be something like
-   * def handleMap(...) = {...}
+   * Quote to handle a map
    */
-  def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
   def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
     import c.universe._
@@ -54,7 +53,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
 
-  def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree
+  /**
+   * Quote to handle a collection
+   */
+  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree
 
   def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree
 
@@ -131,7 +133,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
       ct =>
         val pattern = simpleTypeNm(ct.toString)
-        val method = itemMethNm(pattern)
+        val method = methdOfHandleItemTpe(pattern)
         val (iQuote, handlerQuote) =
           if (hasNoAccessor(c)(ct))
             (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
@@ -182,27 +184,20 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
-        val handleMeth = "handleCollection"
-        q"""
-          ${collectionQuote(c)(t.typeArgs.head)(tpeClassNm(c)(t))(handleMeth)}
-          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        val itemTpe = t.typeArgs.head
+        val collTpe = tpeClassNm(c)(t)
+        collectionQuote(c)(objNm)(fieldNm)(itemTpe)(collTpe)
 
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
         val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
-          t => (t, itemMethNm(t.toString))
+          t => (t, methdOfHandleItemTpe(t.toString))
         }.unzip
         val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
           if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
           else Nil
         }
-        val methName = TermName("handleMap")
-        val defMethQuote = handleMapQuote(c)(methName)((keyTpe, valTpe))((keyMeth, valMeth))(itemQuotes)
-        q"""
-          $defMethQuote
-          $methName(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        mapQuote(c)(objNm)(fieldNm)((keyTpe, valTpe))((keyMeth, valMeth))(itemQuotes)
 
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
@@ -222,7 +217,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val handleMeth = itemMethNm(t.toString + "_traitFamily")
+        val handleMeth = methdOfHandleItemTpe(t.toString + "_traitFamily")
         q"""
           ${sealedTraitQuote(c)(t)(objNm)(fieldNm)(handleMeth)}
           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})

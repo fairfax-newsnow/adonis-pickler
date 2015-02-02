@@ -19,7 +19,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def handleMapQuote(c: Context)(handleMapMeth: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  /**
+   * Quote to parse a map, it will be something like
+   * def parseMap(map: J) = ???
+   * parseMap(reader.readObjectField(objNm, s"$fieldNm"))
+   */
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val(keyMeth, valMeth) = kvMeths
     val methodImplQuote =
@@ -35,42 +40,55 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           }.toMap
         """
       }
-    q"def $handleMapMeth(map: J) = $methodImplQuote"
+
+    val parseMapMethNm = TermName("parseMap")
+    q"""
+      def $parseMapMethNm(map: J) = $methodImplQuote
+      $parseMapMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+    """
   }
 
-  def collectionQuote(c: Context)(tpe: c.universe.Type)(collType: String)(methodNm: String): c.universe.Tree = {
+  /**
+   * Quote to parse a collection, it will be something like
+   * def parseCollection(array: J) = ???
+   * parseCollection(reader.readObjectField(objNm, s"$fieldNm"))
+   */
+  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val createMeth = itemMethNm(tpe.toString)
+    val parseItemMeth = TermName(methdOfHandleItemTpe(itemTpe.toString))
     val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
-            idx => ${TermName(createMeth)}(${jsonIo(c)}.readArrayElem(array, idx))
+            idx => $parseItemMeth(${jsonIo(c)}.readArrayElem(array, idx))
           }
       """
 
+    // if it's not Seq but, say, List, append .toList to the quote
     val toCollQuote =
       if (collType == tpeClassNm(c)(typeOf[Seq[_]]))
         intsToItemsQuote
       else
         q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
 
-    val nonNullQuote =
-      q"""
-        ${itemQuote(c)(tpe)(createMeth)}
-        val arraySize = ${jsonIo(c)}.readArrayLength(array)
-        $toCollQuote
-      """
-
-    q"""
-      def ${TermName(methodNm)}(array: J) = {
-        ${quoteWithNullCheck(c)(varOfNullCheck = "array")(nonNullQuote)}
+    val parseCollMethImpl =
+      quoteWithNullCheck(c)(varOfNullCheck = "array") {
+        q"""
+          ${itemQuote(c)(itemTpe)(parseItemMeth)}
+          val arraySize = ${jsonIo(c)}.readArrayLength(array)
+          $toCollQuote
+        """
       }
+
+    val parseCollMethNm = TermName("parseCollection")
+    q"""
+      def $parseCollMethNm(array: J) = $parseCollMethImpl
+      $parseCollMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
   def optionQuote(c: Context)(tpe: c.universe.Type)(methodNm: String): c.universe.Tree = {
     import c.universe._
-    val createMeth = itemMethNm(tpe.toString)
+    val createMeth = methdOfHandleItemTpe(tpe.toString)
     q"""
       def ${TermName(methodNm)}(json: J): Option[$tpe] = {
         ${itemQuote(c)(tpe)(createMeth)}
@@ -88,8 +106,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val rightTpe = tpe.dealias.typeArgs.last
     val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
     val simpleRightTpe = simpleTypeNm(rightTpe.toString)
-    val leftMeth = itemMethNm(leftTpe.toString)
-    val rightMeth = itemMethNm(rightTpe.toString)
+    val leftMeth = methdOfHandleItemTpe(leftTpe.toString)
+    val rightMeth = methdOfHandleItemTpe(rightTpe.toString)
 
     q"""
       def ${TermName(methodNm)}(json: J): Either[$leftTpe, $rightTpe] = {
