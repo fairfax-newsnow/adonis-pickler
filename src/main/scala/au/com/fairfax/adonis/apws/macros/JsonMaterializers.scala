@@ -26,7 +26,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * @return "read" if this is parser, o.w. "make"
    */
-  def ioActionString: String
+  def ioAction: String
+  
+  def ioString(c: Context): c.universe.TermName = c.universe.TermName(ioAction + "String")
+
+  def ioBoolean(c: Context): c.universe.TermName = c.universe.TermName(ioAction + "Boolean")
 
   def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
 
@@ -75,7 +79,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       $preQuote
       ${
         quoteWithNullCheck(c)(varOfNullCheck) {
-          q"${jsonIo(c)}.${TermName(ioActionString + "String")}($varOfNullCheck)"
+          q"${jsonIo(c)}.${ioString(c)}($varOfNullCheck)"
         }
       }
     """
@@ -180,7 +184,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
-        q"${jsonIo(c)}.${TermName(ioActionString + "Boolean")}(${fieldQuote(c)(objNm)(fieldNm)})"
+        q"${jsonIo(c)}.${ioBoolean(c)}(${fieldQuote(c)(objNm)(fieldNm)})"
 
       // a collection type
       case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>

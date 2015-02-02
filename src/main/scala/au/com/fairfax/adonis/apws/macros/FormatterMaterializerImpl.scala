@@ -7,7 +7,7 @@ import Materializer._
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
-  lazy val ioActionString: String = "make"
+  lazy val ioAction: String = "make"
 
   private def toJsonStringQuote(c: Context)(s: String): c.universe.Tree = {
     import c.universe._

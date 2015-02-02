@@ -7,7 +7,7 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
-  lazy val ioActionString: String = "read"
+  lazy val ioAction: String = "read"
 
   def concatVarNms(varNms: String*): String =
     varNms mkString "_"
