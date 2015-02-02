@@ -12,10 +12,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${jsonIo(c)}.makeString($s)"
   }
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree =
-    itemQuoteTemplate(c)(tpe)(methodNm) {
-      recurQuote(c)(tpe)(_)("")(false)
+  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
+    itemQuoteTemplate(c)(itemTpe)(methodNm) {
+      recurQuote(c)(itemTpe)(_)("")(false)
     }
+  }
 
   private def itemQuoteTemplate(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(quoteFunc: String => c.universe.Tree): c.universe.Tree = {
     import c.universe._
@@ -35,22 +36,22 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     val (keyTpe, valTpe) = kvTpes
     val (keyMeth, valMeth) = kvMeths
-    val methodImplQuote =
-      quoteWithNullCheck(c)(varOfNullCheck = "map") {
-        q"""
-            ..$itemQuotes
-            val elems =
-              map.map { t =>
-                val (k, v) = t
-                ${jsonIo(c)}.makeArray($keyMeth(k), $valMeth(v))
-              }.toList
-            ${jsonIo(c)}.makeArray(elems: _*)
-        """
-      }
 
     val formatMapMethNm = TermName("formatMap")
     q"""
-      def $formatMapMethNm(map: $keyTpe Map $valTpe) = $methodImplQuote
+      def $formatMapMethNm(map: $keyTpe Map $valTpe) = ${
+        quoteWithNullCheck(c)(varOfNullCheck = "map") {
+          q"""
+              ..$itemQuotes
+              val elems =
+                map.map { t =>
+                  val (k, v) = t
+                  ${jsonIo(c)}.makeArray($keyMeth(k), $valMeth(v))
+                }.toList
+              ${jsonIo(c)}.makeArray(elems: _*)
+          """
+        }
+      }
       $formatMapMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -63,21 +64,17 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
     val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
-
-    val formatCollMethImpl =
-      quoteWithNullCheck(c)(varOfNullCheck = "objList") {
-        q"""
-          ${itemQuote(c)(itemTpe)(formatItemMeth)}
-          val jsonList = objList.map {
-            obj => $formatItemMeth(obj)
-          }
-          ${jsonIo(c)}.makeArray(jsonList: _*)
-        """
-      }
-
     val formatCollMethNm = TermName("formatCollection")
     q"""
-      def $formatCollMethNm(objList: $collType[$itemTpe]) = $formatCollMethImpl
+      def $formatCollMethNm(objList: $collType[$itemTpe]) = ${
+        quoteWithNullCheck(c)(varOfNullCheck = "objList") {
+          q"""
+            ${quoteOfHandleItemDef(c)(itemTpe)(formatItemMeth)}
+            val jsonList = objList.map { obj => $formatItemMeth(obj) }
+            ${jsonIo(c)}.makeArray(jsonList: _*)
+          """
+        }
+      }
       $formatCollMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -97,7 +94,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val formatOptionMethNm = TermName("formatOption")
     q"""
       def $formatOptionMethNm(opt: Option[$itemTpe]) = {
-        ${itemQuote(c)(itemTpe)(formatItemMeth)}
+        ${quoteOfHandleItemDef(c)(itemTpe)(formatItemMeth)}
         opt match {
           case ..$caseQuotes
         }

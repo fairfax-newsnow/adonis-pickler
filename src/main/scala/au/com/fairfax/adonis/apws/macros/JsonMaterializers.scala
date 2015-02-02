@@ -36,7 +36,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def numDealisTpeNms(c: Context) =
     List(deliasTpeName[Double](c), deliasTpeName[Float](c), deliasTpeName[Short](c), deliasTpeName[Int](c), deliasTpeName[Long](c))
 
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
+  /**
+   * Qutoe of method definition that handle an Item
+   */
+  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle a map
@@ -196,8 +199,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
           t => (t, methdNameOfHandleItem(t.toString))
         }.unzip
-        val itemQuotes = itemQuote(c)(keyTpe)(keyMeth) :: {
-          if (keyTpe != valTpe) List(itemQuote(c)(valTpe)(valMeth))
+        val itemQuotes = quoteOfHandleItemDef(c)(keyTpe)(keyMeth) :: {
+          if (keyTpe != valTpe) List(quoteOfHandleItemDef(c)(valTpe)(valMeth))
           else Nil
         }
         mapQuote(c)(objNm)(fieldNm)((keyTpe, valTpe))((keyMeth, valMeth))(itemQuotes)

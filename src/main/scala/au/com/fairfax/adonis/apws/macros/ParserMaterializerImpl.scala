@@ -10,12 +10,15 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def concatVarNms(varNms: String*): String =
     varNms mkString "_"
 
-  // don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
-  def itemQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
+  /**
+   * Qutoe of method definition that parse an Item
+   * don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
+   */
+  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
       def $methodNm(item: ${TypeName("J")}) =
-        ${recurQuote(c)(tpe)("item")("")(false)}
+        ${recurQuote(c)(itemTpe)("item")("")(false)}
     """
   }
 
@@ -27,23 +30,22 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val(keyMeth, valMeth) = kvMeths
-    val methodImplQuote =
-      quoteWithNullCheck(c)(varOfNullCheck = "map") {
-        q"""
-          ..$itemQuotes
-          val mapSize = ${jsonIo(c)}.readArrayLength(map)
-          (0 until mapSize).toList.map { idx =>
-            val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
-            val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
-            val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
-            $keyMeth(key) -> $valMeth(value)
-          }.toMap
-        """
-      }
-
     val parseMapMethNm = TermName("parseMap")
     q"""
-      def $parseMapMethNm(map: J) = $methodImplQuote
+      def $parseMapMethNm(map: J) = ${
+        quoteWithNullCheck(c)(varOfNullCheck = "map") {
+          q"""
+            ..$itemQuotes
+            val mapSize = ${jsonIo(c)}.readArrayLength(map)
+            (0 until mapSize).toList.map { idx =>
+              val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
+              val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
+              val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
+              $keyMeth(key) -> $valMeth(value)
+            }.toMap
+          """
+        }
+      }
       $parseMapMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -70,18 +72,17 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       else
         q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
 
-    val parseCollMethImpl =
-      quoteWithNullCheck(c)(varOfNullCheck = "array") {
-        q"""
-          ${itemQuote(c)(itemTpe)(parseItemMeth)}
-          val arraySize = ${jsonIo(c)}.readArrayLength(array)
-          $toCollQuote
-        """
-      }
-
     val parseCollMethNm = TermName("parseCollection")
     q"""
-      def $parseCollMethNm(array: J) = $parseCollMethImpl
+      def $parseCollMethNm(array: J) = ${
+        quoteWithNullCheck(c)(varOfNullCheck = "array") {
+          q"""
+            ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
+            val arraySize = ${jsonIo(c)}.readArrayLength(array)
+            $toCollQuote
+          """
+        }
+      }
       $parseCollMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -94,18 +95,15 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
-    val parseOptionMethImpl =
-      q"""
-        ${itemQuote(c)(itemTpe)(parseItemMeth)}
+    val parseOptionMethdNm = TermName("parseOption")
+    q"""
+      def $parseOptionMethdNm(json: J): Option[$itemTpe] = {
+        ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
         if (${jsonIo(c)}.isNull(json))
           None
         else
           Some($parseItemMeth(json))
-      """
-    
-    val parseOptionMethdNm = TermName("parseOption")
-    q"""
-      def $parseOptionMethdNm(json: J): Option[$itemTpe] = $parseOptionMethImpl
+      }
       $parseOptionMethdNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -229,7 +227,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
-    itemQuote(c)(ct)(c.universe.TermName(method))
+    quoteOfHandleItemDef(c)(ct)(c.universe.TermName(method))
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
     import c.universe._
