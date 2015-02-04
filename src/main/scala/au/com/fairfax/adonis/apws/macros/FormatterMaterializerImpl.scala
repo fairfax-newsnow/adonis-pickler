@@ -257,12 +257,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(methodNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
+  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
+    val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
     q"""
-      def $methodNm($objNm: $tpe) = {
-        $quote
-      }
+      def $handleTraitMethNm($objNm: $traitTpe) = $quote
+      $handleTraitMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 

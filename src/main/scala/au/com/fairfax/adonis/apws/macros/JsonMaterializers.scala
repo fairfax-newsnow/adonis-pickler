@@ -136,45 +136,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
 
-  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(methodNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
-
-  final def sealedTraitQuote(c: Context)(traitTpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
-    import c.universe._
-
-    val childTypes = traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-      des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-    }.map(_.asInstanceOf[Symbol].asType.toType)
-
-    val onlyCaseObjects = childTypes forall hasNoAccessor(c)
-
-    val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
-      ct =>
-        val pattern = simpleTypeNm(ct.toString)
-        val method = methdNameOfHandleItem(pattern)
-        val (iQuote, handlerQuote) =
-          if (hasNoAccessor(c)(ct))
-            (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
-          else
-            (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
-        (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
-    }.unzip
-
-    val nonNullQuote =
-      q"""
-        ..$itemQuotes
-        ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
-      """
-
-    val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
-    q"""
-        ${
-          nullHandlerQuote(c)(traitTpe)(objNm)(handleTraitMethNm) {
-            quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)
-          }
-        }
-        $handleTraitMethNm(${fieldQuote(c)(objNm)(fieldNm)})
-    """
-  }
+  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
 
@@ -233,8 +195,34 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         eitherQuote(c)(objNm)(fieldNm)(t)
 
       // a sealed trait
-      case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        sealedTraitQuote(c)(t)(objNm)(fieldNm)
+      case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
+        val childTypes = traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+          des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+        }.map(_.asInstanceOf[Symbol].asType.toType)
+
+        val onlyCaseObjects = childTypes forall hasNoAccessor(c)
+
+        val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
+          ct =>
+            val pattern = simpleTypeNm(ct.toString)
+            val method = methdNameOfHandleItem(pattern)
+            val (iQuote, handlerQuote) =
+              if (hasNoAccessor(c)(ct))
+                (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
+              else
+                (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+            (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
+        }.unzip
+
+        val traitMethImplQuote =
+          quoteWithNullCheck(c)(varOfNullCheck = objNm) {
+            q"""
+              ..$itemQuotes
+              ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
+            """
+          }
+
+        traitFamilyMethDefAndCallQuote(c)(traitTpe)(objNm)(fieldNm)(traitMethImplQuote)
 
       // a structured type
       case _ =>
