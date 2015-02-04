@@ -11,8 +11,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     varNms mkString "_"
 
   /**
-   * Qutoe of method definition that parse an Item
-   * don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
+   * Qutoe of method definition that parse an Item, it will be something like
+   * def $methodNm(item: J) = ???
+   * 
+   * Note: don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
    */
   def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -125,8 +127,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     q"""
       def $parseEitherMethNm(json: J): Either[$leftTpe, $rightTpe] = {
-        ${caseClassItemQuote(c)(leftMeth)(leftTpe)("")}
-        ${caseClassItemQuote(c)(rightMeth)(rightTpe)("")}
+        ${handleCaseClassDefQuote(c)(leftMeth)(leftTpe)("")}
+        ${handleCaseClassDefQuote(c)(rightMeth)(rightTpe)("")}
         val value = ${jsonIo(c)}.readObjectField(json, "v")
         val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
         providedTypeName match {
@@ -229,14 +231,18 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   /**
    * Quote to create method definition that creates a "case object" of tpe
    */
-  def quoteOfHandleCaseObjDef(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     this.synchronized {
       import c.universe._
       q"def $methodNm = new $tpe"
     }
   }
 
-  def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
+  /**
+   * Quote to create method definition that parse an case class object of type ct, it will be seomthing like
+   * def $methodNm(item: J) = ???
+   */
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
     quoteOfHandleItemDef(c)(ct)(method)
 
   def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
@@ -244,7 +250,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"""$method(${jsonIo(c)}.readObjectField($objNm, "v"))"""
   }
 
-  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
+  /**
+   * Quote that maps a pattern to the corresponding handler, it will be someething like
+   * s"$pattern" => handler
+   */
+  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     cq"$pattern => $handlerQuote"
   }

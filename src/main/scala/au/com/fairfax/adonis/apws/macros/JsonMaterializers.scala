@@ -126,13 +126,23 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def quoteOfHandleCaseObjDef(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree
+  /**
+   * Quote to create method definition that handle a "case object" of tpe
+   */
+  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
-  def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
+  /**
+   * Quote to create method definition that parse an case class object of type ct
+   */
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
 
   def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree
 
-  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree
+  /**
+   * Quote that maps a pattern to the corresponding handler, it will be someething like
+   * pattern => handler
+   */
+  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
 
@@ -202,24 +212,26 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
         val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
-        val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
+        // patternToHandlerQuotes are the list of quotes which each defines something like pattern => patternHandlerQuote
+        val (itemQuotes, patternToHandlerQuotes) = childTypes.map {
           ct =>
             val pattern = simpleTypeNm(ct.toString)
             val method = TermName(methdNameOfHandleItem(pattern))
-            val (iQuote, handlerQuote) =
-              if (hasNoAccessor(c)(ct))
-                (quoteOfHandleCaseObjDef(c)(ct)(method)(onlyCaseObjects), q"$method")
-              else
-                (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+            // patternHandlerQuote is the quote defining the logic to be mapped by the corresponding matched pattern, it is a method call for simplicity
+            val (iQuote, patternHandlerQuote) =
+              if (hasNoAccessor(c)(ct))  // case "object"
+                (handleCaseObjDefQuote(c)(ct)(method)(onlyCaseObjects), q"$method")
+              else  // case class
+                (handleCaseClassDefQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
 
-            (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
+            (iQuote, patternToHandlerQuote(c)(ct)(pattern)(patternHandlerQuote))
         }.unzip
 
         val traitMethImplQuote =
           quoteWithNullCheck(c)(varOfNullCheck = objNm) {
             q"""
               ..$itemQuotes
-              ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
+              ${ptnMatchQuote(c)(onlyCaseObjects)(patternToHandlerQuotes)(objNm)}
             """
           }
 

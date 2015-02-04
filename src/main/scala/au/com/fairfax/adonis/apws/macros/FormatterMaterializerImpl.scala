@@ -123,8 +123,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
     q"""
       def $formatMethNm(either: Either[$leftTpe, $rightTpe]) = {
-        ${caseClassItemQuote(c)(leftFormatMeth)(leftTpe)(fieldNm)}
-        ${caseClassItemQuote(c)(rightFormatMeth)(rightTpe)(fieldNm)}
+        ${handleCaseClassDefQuote(c)(leftFormatMeth)(leftTpe)(fieldNm)}
+        ${handleCaseClassDefQuote(c)(rightFormatMeth)(rightTpe)(fieldNm)}
         either match {
           case ..$caseQuotes
         }
@@ -213,7 +213,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   /**
    * Quote to create method definition that formats the "case object" of tpe
    */
-  def quoteOfHandleCaseObjDef(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
     val typeName = simpleTypeNm(tpe.toString)
     val methodImplQuote =
@@ -225,7 +225,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"def $methodNm = $methodImplQuote"
   }
 
-  def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
       varName =>
@@ -244,9 +244,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"$method(${TermName(varBeMatched)})"
   }
 
-  def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
+  /**
+   * Quote that maps a pattern to the corresponding handler, it will be something like
+   * obj @ (_: Pattern) => handler
+   */
+  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
-    cq"${TermName(varBeMatched)} : ${ct} => $handlerQuote"
+    cq"${TermName(varBeMatched)} : $ct => $handlerQuote"
   }
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {
