@@ -126,11 +126,11 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
+  def quoteOfHandleCaseObjDef(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
   def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
 
-  def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree
+  def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree
 
   def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree
 
@@ -205,12 +205,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val (itemQuotes, ptnToHandlerQuotes) = childTypes.map {
           ct =>
             val pattern = simpleTypeNm(ct.toString)
-            val method = methdNameOfHandleItem(pattern)
+            val method = TermName(methdNameOfHandleItem(pattern))
             val (iQuote, handlerQuote) =
               if (hasNoAccessor(c)(ct))
-                (caseObjQuote(c)(ct)(method)(onlyCaseObjects), q"${TermName(method)}")
+                (quoteOfHandleCaseObjDef(c)(ct)(method)(onlyCaseObjects), q"$method")
               else
                 (caseClassItemQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+
             (iQuote, ptnToHandlerQuote(c)(ct)(handlerQuote)(pattern))
         }.unzip
 

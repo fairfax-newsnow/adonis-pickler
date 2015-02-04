@@ -202,7 +202,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote that reads the field on that object.
-   * if the field name is "", objNm is the field, return objNm
+   * if the field name is "", objNm is the field, therefore return objNm
    * o.w. return reader.readObjectField(objNm, s"$fieldNm")
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
@@ -226,19 +226,22 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  /**
+   * Quote to create method definition that creates a "case object" of tpe
+   */
+  def quoteOfHandleCaseObjDef(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     this.synchronized {
       import c.universe._
-      q"def ${TermName(methodNm)} = new $tpe"
+      q"def $methodNm = new $tpe"
     }
   }
 
   def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
     quoteOfHandleItemDef(c)(ct)(method)
 
-  def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree = {
+  def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"""${TermName(method)}(${jsonIo(c)}.readObjectField(${TermName(objNm)}, "v"))"""
+    q"""$method(${jsonIo(c)}.readObjectField($objNm, "v"))"""
   }
 
   def ptnToHandlerQuote(c: Context)(ct: c.universe.Type)(handlerQuote: c.universe.Tree)(pattern: String): c.universe.Tree = {
@@ -262,6 +265,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
+  /**
+   * Quote to create a method definition of handle_TRAITTYPE_traitFamily and a call to it, it will be something like
+   * def handle_TRAITTYPE_traitFamily(objNm: J) = ???
+   * handle_TRAITTYPE_traitFamily(reader.readObjectField(objNm, s"$fieldNm"))
+   */
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
