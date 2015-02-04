@@ -217,7 +217,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
+  def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
       varName =>

@@ -9,6 +9,10 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 import au.com.fairfax.adonis.apws.types.Enum
 
 object Materializer {
+  /**
+   * name of method that handle a item of a particular type, the name will include the item type,
+   * e.g. for a string, it will be "handle_String"
+   */
   def methdNameOfHandleItem(typeName: String): String =
     ("handle" :: List(typeName).flatMap(_ split "\\[").flatMap(_ split ",").flatMap(_ split "\\]").map(simpleTypeNm).flatMap(_ split "\\.")).mkString("_")
 
@@ -117,7 +121,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def caseObjQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
-  def caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
+  def caseClassItemQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
 
   def caseClassHandlerQuote(c: Context)(method: String)(objNm: String): c.universe.Tree
 
