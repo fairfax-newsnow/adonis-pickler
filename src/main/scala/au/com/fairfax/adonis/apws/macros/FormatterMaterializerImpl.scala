@@ -211,7 +211,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   }
 
   /**
-   * Quote to create method definition that formats the "case object" of tpe
+   * Quote of method definition that formats the "case object" of tpe
    */
   def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     import c.universe._
@@ -225,6 +225,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"def $methodNm = $methodImplQuote"
   }
 
+  /**
+   * Quote of method definition that creates an case class object of type ct, it will be seomthing like
+   * def $methodNm(item: ITEMTYPE) = ???
+   */
   def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
@@ -239,9 +243,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   private lazy val varBeMatched = "obj"
 
-  def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
+  /**
+   * Quote of call to method which is the method that formats the case class of a trait
+   */
+  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"$method(${TermName(varBeMatched)})"
+    q"$handleCaseClassMeth(${TermName(varBeMatched)})"
   }
 
   /**
@@ -253,11 +260,19 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     cq"${TermName(varBeMatched)} : $ct => $handlerQuote"
   }
 
-  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {
+  /**
+   * Quote that defines the case pattern on a list of the sealed trait family, it will be
+   * objNm match {
+   *   case (obj @ (_: CaseObject1)) => handle_CaseObject1
+   *   case (obj @ (_: CaseClass2)) => handle_CaseClass(obj)
+   *   ...
+   * }
+   */
+  def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
-      ${TermName(objNm)} match {
-        case ..$ptnToHandlerQuotes
+      $objNm match {
+        case ..$patternToHandlerQuotes
       }
     """
   }

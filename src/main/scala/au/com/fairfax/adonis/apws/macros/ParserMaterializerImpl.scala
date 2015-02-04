@@ -220,16 +220,19 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
-    val nonNullQuote = q"new $tpe(..$accessorQuotes)"
     val assignedVar = concatVarNms(objNm, fieldNm)
     q"""
       val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
-      ${quoteWithNullCheck(c)(varOfNullCheck = assignedVar)(nonNullQuote)}
+      ${
+        quoteWithNullCheck(c)(varOfNullCheck = assignedVar) {
+          q"new $tpe(..$accessorQuotes)"
+        }
+      }
     """
   }
 
   /**
-   * Quote to create method definition that creates a "case object" of tpe
+   * Quote of method definition that creates a "case object" of tpe, it will be something like
    */
   def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
     this.synchronized {
@@ -239,15 +242,18 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote to create method definition that parse an case class object of type ct, it will be seomthing like
+   * Quote of method definition that creates an case class object of type ct, it will be seomthing like
    * def $methodNm(item: J) = ???
    */
   def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
     quoteOfHandleItemDef(c)(ct)(method)
 
-  def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
+  /**
+   * Quote of call to method which is the method that parse the case class of a trait
+   */
+  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"""$method(${jsonIo(c)}.readObjectField($objNm, "v"))"""
+    q"""$handleCaseClassMeth(${jsonIo(c)}.readObjectField($objNm, "v"))"""
   }
 
   /**
@@ -259,18 +265,31 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     cq"$pattern => $handlerQuote"
   }
 
-  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree = {
+  /**
+   * Quote that defines the case pattern on a list of the sealed trait family, if all the members are case "objects", it will be
+   * reader.readString(objNm) match {
+   *   case "CaseObject1" => handle_CaseObject1
+   *   case "CaseObject2" => handle_CaseObject2
+   *   ...
+   * }
+   * o.w.
+   * reader.readString(reader.readObjectField(objNm, "t")) match {
+   *  case "CaseObject1" => handle_CaseObject1
+   *  case "CaseClass2" => handle_CaseClass2(reader.readObjectField(objNm, "v"))
+   * }
+   */
+  def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     if (onlyCaseObjects)
       q"""
-        ${jsonIo(c)}.readString(${TermName(objNm)}) match {
-          case ..$ptnToHandlerQuotes
+        ${jsonIo(c)}.readString($objNm) match {
+          case ..$patternToHandlerQuotes
         }
       """
     else
       q"""
-        ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(${TermName(objNm)}, "t")) match {
-          case ..$ptnToHandlerQuotes
+        ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField($objNm, "t")) match {
+          case ..$patternToHandlerQuotes
         }
       """
   }

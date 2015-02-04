@@ -127,16 +127,19 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
   /**
-   * Quote to create method definition that handle a "case object" of tpe
+   * Quote of method definition that handle a "case object" of tpe
    */
   def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree
 
   /**
-   * Quote to create method definition that parse an case class object of type ct
+   * Quote of method definition that parse an case class object of type ct
    */
   def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
 
-  def caseClassHandlerQuote(c: Context)(method: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree
+  /**
+   * Quote of call to method which is the method that handle the case class of a trait
+   */
+  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote that maps a pattern to the corresponding handler, it will be someething like
@@ -144,7 +147,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree
 
-  def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
+  def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree
 
@@ -212,26 +215,28 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
         val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
-        // patternToHandlerQuotes are the list of quotes which each defines something like pattern => patternHandlerQuote
-        val (itemQuotes, patternToHandlerQuotes) = childTypes.map {
+        // patternToHandleChildTypeCallQuotes are the list of quotes where each defines something like ChildType => handleChildTypeCall
+        // handleChildTypeDefQuotes is list of handleChildTypeDefQuote
+        val (handleChildTypeDefQuotes, patternToHandleChildTypeCallQuotes) = childTypes.map {
           ct =>
-            val pattern = simpleTypeNm(ct.toString)
-            val method = TermName(methdNameOfHandleItem(pattern))
-            // patternHandlerQuote is the quote defining the logic to be mapped by the corresponding matched pattern, it is a method call for simplicity
-            val (iQuote, patternHandlerQuote) =
+            val childType = simpleTypeNm(ct.toString)
+            val handleChildTypeMeth = TermName(methdNameOfHandleItem(childType))
+            // handleChildTypeDefQuote defines the method that handles the case object or case class
+            // handleChildTypeCallQuote is a call to method defined by handleChildTypeDefQuote
+            val (handleChildTypeDefQuote, handleChildTypeCallQuote) =
               if (hasNoAccessor(c)(ct))  // case "object"
-                (handleCaseObjDefQuote(c)(ct)(method)(onlyCaseObjects), q"$method")
+                (handleCaseObjDefQuote(c)(ct)(handleChildTypeMeth)(onlyCaseObjects), q"$handleChildTypeMeth")
               else  // case class
-                (handleCaseClassDefQuote(c)(method)(ct)(fieldNm), caseClassHandlerQuote(c)(method)(objNm))
+                (handleCaseClassDefQuote(c)(handleChildTypeMeth)(ct)(fieldNm), handleCaseClassCallQuote(c)(handleChildTypeMeth)(objNm))
 
-            (iQuote, patternToHandlerQuote(c)(ct)(pattern)(patternHandlerQuote))
+            (handleChildTypeDefQuote, patternToHandlerQuote(c)(ct)(childType)(handleChildTypeCallQuote))
         }.unzip
 
         val traitMethImplQuote =
           quoteWithNullCheck(c)(varOfNullCheck = objNm) {
             q"""
-              ..$itemQuotes
-              ${ptnMatchQuote(c)(onlyCaseObjects)(patternToHandlerQuotes)(objNm)}
+              ..$handleChildTypeDefQuotes
+              ${ptnMatchQuoteForTraitFamily(c)(onlyCaseObjects)(patternToHandleChildTypeCallQuotes)(objNm)}
             """
           }
 
