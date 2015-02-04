@@ -257,10 +257,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree = {
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(methodNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(methodNm)}(${TermName(objNm)}: $tpe) = {
+      def $methodNm($objNm: $tpe) = {
         $quote
       }
     """
@@ -296,6 +296,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           }
           GenJsonFormatter
         """
+//    println(
+//      s"""
+//         |formatter
+//         |$result
+//       """.stripMargin)
     c.Expr[JsonFormatter[T]](result)
   }
 }

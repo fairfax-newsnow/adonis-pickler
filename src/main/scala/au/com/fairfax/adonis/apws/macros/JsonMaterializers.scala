@@ -70,6 +70,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree
 
+  /**
+   * Quote to handle an either
+   */
   def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree
 
   /**
@@ -98,9 +101,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def quoteForNullVar(c: Context): c.universe.Tree
 
   /**
-   * A func template that creates a quote to do null check on a var, and executes correspondingly upon different condition.
+   * A func template that creates a quote to do null check on a var, and executes correspondingly upon different condition, the pseudo code will be something like,
+   * if (varOfNullCheck found to be null) <- this checking is subclass specific
+   *   quote for the logic be executed for varOfNullCheck found to be null
+   * else
+   *  quote for the logic be executed for varOfNullCheck found to be not null
    */
-  def quoteWithNullCheck(c: Context)(varOfNullCheck: c.universe.TermName)(quoteForNonNullVar: => c.universe.Tree): c.universe.Tree = {
+  final def quoteWithNullCheck(c: Context)(varOfNullCheck: c.universe.TermName)(quoteForNonNullVar: => c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
       if (${ quoteForNullCheck(c)(varOfNullCheck) })
@@ -129,13 +136,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def ptnMatchQuote(c: Context)(onlyCaseObjects: Boolean)(ptnToHandlerQuotes: Set[c.universe.Tree])(objNm: String): c.universe.Tree
 
-  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(methodNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
-  def sealedTraitQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(methodNm: String): c.universe.Tree = {
+  final def sealedTraitQuote(c: Context)(traitTpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
 
-    val childTypes = tpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-      des => des.isSealed || tpeClassNm(c)(tpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+    val childTypes = traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+      des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType.toType)
 
     val onlyCaseObjects = childTypes forall hasNoAccessor(c)
@@ -158,7 +165,15 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         ${ptnMatchQuote(c)(onlyCaseObjects)(ptnToHandlerQuotes)(objNm)}
       """
 
-    nullHandlerQuote(c)(tpe)(objNm)(methodNm)(q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}")
+    val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
+    q"""
+        ${
+          nullHandlerQuote(c)(traitTpe)(objNm)(handleTraitMethNm) {
+            quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)
+          }
+        }
+        $handleTraitMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+    """
   }
 
   def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
@@ -219,11 +234,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val handleMeth = methdNameOfHandleItem(t.toString + "_traitFamily")
-        q"""
-          ${sealedTraitQuote(c)(t)(objNm)(fieldNm)(handleMeth)}
-          ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        sealedTraitQuote(c)(t)(objNm)(fieldNm)
 
       // a structured type
       case _ =>

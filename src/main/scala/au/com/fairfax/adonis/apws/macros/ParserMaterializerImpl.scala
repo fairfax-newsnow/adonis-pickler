@@ -262,10 +262,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
-  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(methodNm: String)(quote: c.universe.Tree): c.universe.Tree = {
+  def nullHandlerQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(methodNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
-      def ${TermName(methodNm)}(${TermName(objNm)}: ${TypeName("J")}) = {
+      def $methodNm($objNm: ${TypeName("J")}) = {
         $quote
       }
     """
@@ -319,6 +319,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           }
           GenJsonParser
         """
+//    println(
+//      s"""
+//         |parser
+//         |$result
+//       """.stripMargin)
     c.Expr[JsonParser[T]](result)
   }
 }
