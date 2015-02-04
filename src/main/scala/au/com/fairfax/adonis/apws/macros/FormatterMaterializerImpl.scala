@@ -103,12 +103,18 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote to format an either, it will be something like
+   * def formatEither(either: Either[LEFT, RIGHT]) = ???
+   * formatEither(objNm)
+   */
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
     val leftFormatMeth = methdNameOfHandleItem(leftTpe.toString)
     val rightFormatMeth = methdNameOfHandleItem(rightTpe.toString)
+    val formatMethNm = TermName("formatEither")
     //caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String)
     val caseQuotes = List(
       cq"""Left(v) => ${TermName(leftFormatMeth)}(v)""",
@@ -116,13 +122,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     )
 
     q"""
-      def ${TermName(methodNm)}(either: Either[$leftTpe, $rightTpe]) = {
+      def $formatMethNm(either: Either[$leftTpe, $rightTpe]) = {
         ${caseClassItemQuote(c)(leftFormatMeth)(leftTpe)(fieldNm)}
         ${caseClassItemQuote(c)(rightFormatMeth)(rightTpe)(fieldNm)}
         either match {
           case ..$caseQuotes
         }
       }
+      $formatMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 

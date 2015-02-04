@@ -70,7 +70,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree
 
-  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree
 
   /**
    * Quote to handle a numeric value
@@ -215,11 +215,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // an either type
       case t: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(t) =>
-        val handleMeth = "handleEither"
-        q"""
-           ${eitherQuote(c)(t)(handleMeth)(fieldNm: String)}
-           ${TermName(handleMeth)}(${fieldQuote(c)(objNm)(fieldNm)})
-        """
+        eitherQuote(c)(objNm)(fieldNm)(t)
 
       // a sealed trait
       case t: Type if t.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>

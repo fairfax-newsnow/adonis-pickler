@@ -108,27 +108,34 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def eitherQuote(c: Context)(tpe: c.universe.Type)(methodNm: String)(fieldNm: String): c.universe.Tree = {
+  /**
+   * Quote to parse an either, it will be something like
+   * def parseEither(json: J): Either[LEFT, RIGHT] = ???
+   * parseEither(reader.readObjectField(objNm, s"$fieldNm"))
+   */
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
     val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
     val simpleRightTpe = simpleTypeNm(rightTpe.toString)
-    val leftMeth = methdNameOfHandleItem(leftTpe.toString)
-    val rightMeth = methdNameOfHandleItem(rightTpe.toString)
+    val leftMeth = TermName(methdNameOfHandleItem(leftTpe.toString))
+    val rightMeth = TermName(methdNameOfHandleItem(rightTpe.toString))
+    val parseEitherMethNm = TermName("parseEither")
 
     q"""
-      def ${TermName(methodNm)}(json: J): Either[$leftTpe, $rightTpe] = {
+      def $parseEitherMethNm(json: J): Either[$leftTpe, $rightTpe] = {
         ${caseClassItemQuote(c)(leftMeth)(leftTpe)("")}
         ${caseClassItemQuote(c)(rightMeth)(rightTpe)("")}
         val value = ${jsonIo(c)}.readObjectField(json, "v")
         val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
         providedTypeName match {
-          case $simpleLeftTpe => Left(${TermName(leftMeth)}(value))
-          case $simpleRightTpe => Right(${TermName(rightMeth)}(value))
+          case $simpleLeftTpe => Left($leftMeth(value))
+          case $simpleRightTpe => Right($rightMeth(value))
           case missed => throw new Error("Can't match: " + missed)
         }
       }
+      $parseEitherMethNm(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
