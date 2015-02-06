@@ -160,14 +160,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(firstRun: Boolean): c.universe.Tree = {
     import c.universe._
-    val jsSerialisable: c.universe.Type = c.mirror.typeOf[JsSerialisable]
 
     tpe match {
       // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         enumObjQuote(c)(t)(objNm)(fieldNm)
 
-      case t: Type if t <:< jsSerialisable && !firstRun =>
+      case t: Type if t <:< c.mirror.typeOf[JsSerialisable] && !firstRun =>
         jsSerialisableQuote(c)(t)(objNm)(fieldNm)
 
       // a numeric type
