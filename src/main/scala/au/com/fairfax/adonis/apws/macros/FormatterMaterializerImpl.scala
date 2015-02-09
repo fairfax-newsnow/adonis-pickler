@@ -1,5 +1,7 @@
 package au.com.fairfax.adonis.apws.macros
 
+import au.com.fairfax.adonis.apws.macros.ParserMaterializerImpl._
+
 import scala.reflect.macros.blackbox.Context
 import au.com.fairfax.adonis.utils.simpleTypeNm
 import Materializer._
@@ -332,24 +334,33 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val result =
-        q"""
-          implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
-            override def format[J](obj: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
-              val typedObj = obj.asInstanceOf[$tpe]
-              ${jsonIo(c)}.makeObject(
-                "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
-                "args" -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
-              )
-            }
-          }
-          GenJsonFormatter
-//        """
+    val result = handlerCreationQuote(c)(tpe)("json")("args")
 //    println(
 //      s"""
 //         |formatter
 //         |$result
 //       """.stripMargin)
     c.Expr[JsonFormatter[T]](result)
+  }
+
+  def handlerCreationQuote(c: Context)(tpeBeHandled: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"""
+      implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpeBeHandled] {
+        override def format[J](${TermName(objNm)}: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+          val typedObj = ${TermName(objNm)}.asInstanceOf[$tpeBeHandled]
+          ${jsonIo(c)}.makeObject(
+            "t" -> ${jsonIo(c)}.makeString(${tpeBeHandled.toString}),
+            "args" -> ${recurQuote(c)(tpeBeHandled)("typedObj")("")(true)}
+          )
+        }
+
+        override def buildChildFormatters: String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_] = {
+          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
+        }
+      }
+      
+      GenJsonFormatter
+      """
   }
 }

@@ -44,8 +44,21 @@ class BaseJsonRegistry extends JsonRegistry {
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
-    parsers ++= (parser.buildChildParsers + (key -> parser))
+//    parsers ++= (parser.buildChildParsers + (key -> parser))
+    parsers += (key -> parser)
+//    formatters ++= (formatter.buildChildFormatters + (key -> formatter))
     formatters += (key -> formatter)
+    
+//    println(
+//      s"""
+//         |parser.buildChildParsers =
+//         |${parser.buildChildParsers} =
+//         |(key -> parser)
+//         |${(key -> parser)}
+//         |formatter.buildChildFormatters =
+//         |${formatter.buildChildFormatters}
+//         |$formatters
+//       """.stripMargin)
   }
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
