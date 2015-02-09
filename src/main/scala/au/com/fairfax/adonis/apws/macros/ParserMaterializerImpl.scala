@@ -366,30 +366,33 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val result =
-        q"""
-          import au.com.fairfax.adonis.apws.macros.JsonParser
-          
-          implicit object GenJsonParser extends JsonParser[${tpe.dealias}] {
-            override def parse[J](json: J)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
-              def parseJsSerialised(jsSerialised: J) =
-                au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
-
-              ${recurQuote(c)(tpe.dealias)("json")("args")(true)}
-            }
-            
-            override def buildChildParsers: String Map JsonParser[_] = {
-              Map[String, JsonParser[_]]()
-            }
-          }
-          
-          GenJsonParser
-//        """
-//    println(
-//      s"""
-//         |parser
-//         |$result
-//       """.stripMargin)
+    val result = jsonParserQuote(c)(tpe)("json")("args")
+    println(
+      s"""
+         |parser
+         |$result
+       """.stripMargin)
     c.Expr[JsonParser[T]](result)
+  }
+  
+  private def jsonParserQuote(c: Context)(tpeBeParsed: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    q"""
+      import au.com.fairfax.adonis.apws.macros.JsonParser
+      import au.com.fairfax.adonis.apws.macros.JsonRegistry
+          
+      implicit object GenJsonParser extends JsonParser[${tpeBeParsed.dealias}] {
+        override def parse[J](json: J)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
+          def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)
+          ${recurQuote(c)(tpeBeParsed.dealias)(objNm)(fieldNm)(true)}
+        }
+            
+        override def buildChildParsers: String Map JsonParser[_] = {
+          ${childParsersQuote(c)(tpeBeParsed.dealias)(objNm)(fieldNm)}
+        }
+      }
+          
+      GenJsonParser
+    """
   }
 }

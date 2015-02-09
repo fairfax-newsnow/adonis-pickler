@@ -259,6 +259,69 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     }
   }
 
+  def childParsersQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+    import c.universe._
+    
+    println(s"inside childParsersQuote(), tpe = $tpe")
+    
+    tpe match {
+      // an enum type has no child parser, therefore return empty map
+      case t: Type if t <:< c.mirror.typeOf[Enum] =>
+        q"Map[String, JsonParser[_]]()"
+
+      case t: Type if t <:< c.mirror.typeOf[JsSerialisable] =>
+        q"Map[String, JsonParser[_]]()" //TODO
+
+      // a numeric type has no child parser, therefore return empty map
+      case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
+        q"Map[String, JsonParser[_]]()"
+
+      // string type has no child parser, therefore return empty map
+      case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
+        q"Map[String, JsonParser[_]]()"
+
+      // boolean type has no child parser, therefore return empty map
+      case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
+        q"Map[String, JsonParser[_]]()"
+
+      // a collection type
+      case t: Type if collTypes(c) contains tpeClassNm(c)(t) =>
+        q"Map[String, JsonParser[_]]()" //TODO
+        
+      // a map type
+      case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
+        q"Map[String, JsonParser[_]]()" //TODO
+        
+      // an option type
+      case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>
+        q"Map[String, JsonParser[_]]()" //TODO
+
+      // an either type
+      case t: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(t) =>
+        q"Map[String, JsonParser[_]]()" //TODO
+
+      // a sealed trait
+      case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
+        q"Map[String, JsonParser[_]]()" //TODO
+
+      // a structured type
+      case _ =>
+        q"Map[String, JsonParser[_]]()"
+//        val accessors = getAccessors(c)(tpe)
+//        accessors match {
+//          case x :: _ =>
+//            val accessorQuotes = accessors map {
+//              accessor =>
+//                val accessorField = accessor.name.toString
+//                val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+//                eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
+//                q""
+//            }
+//          case noAccessor =>
+//            throw new Error("Can't match: " + tpe)
+//        }
+    }
+  }
 }
 
 trait ParserMaterializer {
