@@ -44,7 +44,7 @@ class BaseJsonRegistry extends JsonRegistry {
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
-    parsers += (key -> parser)
+    parsers ++= (parser.buildChildParsers + (key -> parser))
     formatters += (key -> formatter)
   }
 

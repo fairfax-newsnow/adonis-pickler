@@ -4,6 +4,28 @@ import scala.reflect.macros.blackbox.Context
 import Materializer._
 import au.com.fairfax.adonis.utils.simpleTypeNm
 
+/**
+ * e.g. case class IntWrapper(i: Int), this is a structure class having an integer field, therefore the code will be generated as  
+ * calls recurQuote, the type is matched to a structured type having only 1 accessorField.  The generated code will be:
+ *  
+ * implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[IntWrapper] {
+ *   override def parse[J](json: J)(implicit reader: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
+ *     def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised);
+ *          
+ *     {
+ *       val json_args = reader.readObjectField(json, "args");  // from structuredTypeQuote()
+ *       if (reader.isNull(json_args))                          // from structuredTypeQuote()
+ *         throw new IllegalArgumentException("The json data contains a null attribute which is not mapped to an Option[_] attribute")  // from structuredTypeQuote() 
+ *       else                     // from structuredTypeQuote()
+ *         new IntWrapper(        // from structuredTypeQuote()
+ *           reader.readNumber(   // from eachAccessorQuote and then numericValQuote()
+ *             reader.readObjectField(json_args, "i")).asInstanceOf[Int]  // numericValQuote() and then fieldQuote()
+ *         )
+ *     }
+ *   };
+ * };
+ * GenJsonParser
+ */
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
@@ -346,16 +368,23 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val tpe = weakTypeOf[T]
     val result =
         q"""
-          implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
+          import au.com.fairfax.adonis.apws.macros.JsonParser
+          
+          implicit object GenJsonParser extends JsonParser[${tpe.dealias}] {
             override def parse[J](json: J)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
               def parseJsSerialised(jsSerialised: J) =
                 au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
 
               ${recurQuote(c)(tpe.dealias)("json")("args")(true)}
             }
+            
+            override def buildChildParsers: String Map JsonParser[_] = {
+              Map[String, JsonParser[_]]()
+            }
           }
+          
           GenJsonParser
-        """
+//        """
 //    println(
 //      s"""
 //         |parser

@@ -214,8 +214,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
         val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 
-        // patternToHandleChildTypeCallQuotes are the list of quotes where each defines something like ChildType => handleChildTypeCall
         // handleChildTypeDefQuotes is list of handleChildTypeDefQuote
+        // patternToHandleChildTypeCallQuotes are the list of quotes where each defines something like ChildType => handleChildTypeCall
         val (handleChildTypeDefQuotes, patternToHandleChildTypeCallQuotes) = childTypes.map {
           ct =>
             val childType = simpleTypeNm(ct.toString)
