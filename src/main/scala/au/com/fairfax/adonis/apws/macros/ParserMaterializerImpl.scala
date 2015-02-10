@@ -109,23 +109,50 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote to parse an option, it will be something like
-   * def parseOption(json: J): Option[ITEM] = ???
-   * parseOption(reader.readObjectField(objNm, s"$fieldNm"))
+   * Quote to parse an option, because this is an option field, 
+   * it implies this might be a new field whose data not in the old json data yet, 
+   * therefore it needs to check if its json field is undefined, 
+   * if so, it will be set to None, 
+   * o.w. it will proceed to parsing the data,
+   * it will be something like
+   *  
+   * def parseOption(json: J): Option[ITEM] = {
+   *  def handleItem(item: J) = {
+   *    ... recursive parsing on item
+   *  }  
+   *       
+   *  if (reader.isNull(json))
+   *    None
+   *  else
+   *    Some(handleItem(json))
+   * } // parseOption()
+   * 
+   * val obj_field = reader.readObjectField(obj, s"$field")
+   * if (reader.isUndefined(obj_field)
+   *  None
+   * else  
+   *  parseOption(obj_field)
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val parseOptionMethdNm = TermName("parseOption")
+    val optField = TermName(concatVarNms(objNm.toString, fieldNm))
     q"""
       def $parseOptionMethdNm(json: J): Option[$itemTpe] = {
         ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
+        
         if (${jsonIo(c)}.isNull(json))
           None
         else
           Some($parseItemMeth(json))
       }
-      $parseOptionMethdNm(${fieldQuote(c)(objNm)(fieldNm)})
+      
+      val $optField = ${fieldQuote(c)(objNm)(fieldNm)}
+      if (${jsonIo(c)}.isUndefined($optField))
+        None
+      else
+        $parseOptionMethdNm($optField)
     """
   }
 
@@ -377,15 +404,25 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    */
   def handlerCreationQuote(c: Context)(tpeBeHandled: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
+//    q"""
+//      implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpeBeHandled.dealias}] {
+//        override def parse[J](${TermName(objNm)}: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
+//          def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
+//          ${recurQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)(true)}
+//        }
+//
+//        override def buildChildParsers: String Map au.com.fairfax.adonis.apws.macros.JsonParser[_] = {
+//          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
+//        }
+//      }
+//
+//      GenJsonParser
+//    """
     q"""
       implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpeBeHandled.dealias}] {
         override def parse[J](${TermName(objNm)}: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
           def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
           ${recurQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)(true)}
-        }
-
-        override def buildChildParsers: String Map au.com.fairfax.adonis.apws.macros.JsonParser[_] = {
-          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
         }
       }
 

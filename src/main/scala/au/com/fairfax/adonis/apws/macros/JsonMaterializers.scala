@@ -122,6 +122,9 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
 
+  /**
+   * Quote to handle an accessor, aka a field of a structured type
+   */
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree

@@ -345,6 +345,23 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   def handlerCreationQuote(c: Context)(tpeBeHandled: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
     import c.universe._
+//    q"""
+//      implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpeBeHandled] {
+//        override def format[J](${TermName(objNm)}: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+//          val typedObj = ${TermName(objNm)}.asInstanceOf[$tpeBeHandled]
+//          ${jsonIo(c)}.makeObject(
+//            "t" -> ${jsonIo(c)}.makeString(${tpeBeHandled.toString}),
+//            "args" -> ${recurQuote(c)(tpeBeHandled)("typedObj")("")(true)}
+//          )
+//        }
+//
+//        override def buildChildFormatters: String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_] = {
+//          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
+//        }
+//      }
+//
+//      GenJsonFormatter
+//      """
     q"""
       implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpeBeHandled] {
         override def format[J](${TermName(objNm)}: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
@@ -354,12 +371,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
             "args" -> ${recurQuote(c)(tpeBeHandled)("typedObj")("")(true)}
           )
         }
-
-        override def buildChildFormatters: String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_] = {
-          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
-        }
       }
-      
+
       GenJsonFormatter
       """
   }
