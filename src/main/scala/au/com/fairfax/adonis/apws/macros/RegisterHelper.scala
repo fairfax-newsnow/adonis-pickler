@@ -17,11 +17,13 @@ object RegisterHelper {
       q"""
         implicit object GenRegisterHelper extends au.com.fairfax.adonis.apws.macros.RegisterHelper[${tpe.dealias}] {
           def traversableRegister(implicit parser: au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}], formatter: au.com.fairfax.adonis.apws.macros.JsonFormatter[${tpe.dealias}], keyProvider: au.com.fairfax.adonis.apws.macros.TypeKeyProvider[${tpe.dealias}]): (String Map au.com.fairfax.adonis.apws.macros.JsonParser[_], String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_]) = {
-
-            (Map[String, au.com.fairfax.adonis.apws.macros.JsonParser[_]](), Map[String, au.com.fairfax.adonis.apws.macros.JsonFormatter[_]]())
+            val (parsers, formatters) = registerIntForTest
+            (Map("String" -> parser) ++ parsers, Map("String" -> formatter) ++ formatters)
           }
           
-          private def ownRegisterForTest()
+          private def registerIntForTest(implicit parser: au.com.fairfax.adonis.apws.macros.JsonParser[Int], formatter: au.com.fairfax.adonis.apws.macros.JsonFormatter[Int], keyProvider: au.com.fairfax.adonis.apws.macros.TypeKeyProvider[Int]): (String Map au.com.fairfax.adonis.apws.macros.JsonParser[_], String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_]) = {
+            (Map("Int" -> parser), Map("Int" -> formatter))
+          }
         }
         
         GenRegisterHelper
