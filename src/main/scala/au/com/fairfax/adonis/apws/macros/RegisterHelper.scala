@@ -4,7 +4,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
 trait RegisterHelper[T] {
-  def traversableRegister: (String Map JsonParser[_], String Map JsonFormatter[_])
+  def traversableRegister(implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): (String Map JsonParser[_], String Map JsonFormatter[_])
 }
 
 object RegisterHelper {
@@ -16,9 +16,12 @@ object RegisterHelper {
     val result =
       q"""
         implicit object GenRegisterHelper extends au.com.fairfax.adonis.apws.macros.RegisterHelper[${tpe.dealias}] {
-          def traversableRegister: (String Map au.com.fairfax.adonis.apws.macros.JsonParser[_], String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_]) = {
+          def traversableRegister(implicit parser: au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}], formatter: au.com.fairfax.adonis.apws.macros.JsonFormatter[${tpe.dealias}], keyProvider: au.com.fairfax.adonis.apws.macros.TypeKeyProvider[${tpe.dealias}]): (String Map au.com.fairfax.adonis.apws.macros.JsonParser[_], String Map au.com.fairfax.adonis.apws.macros.JsonFormatter[_]) = {
+
             (Map[String, au.com.fairfax.adonis.apws.macros.JsonParser[_]](), Map[String, au.com.fairfax.adonis.apws.macros.JsonFormatter[_]]())
           }
+          
+          private def ownRegisterForTest()
         }
         
         GenRegisterHelper
@@ -26,7 +29,7 @@ object RegisterHelper {
     
     println(
       s"""
-         |ReigsterHelper.materialze(), result = 
+         |RegisterHelper.materialze(), result =
          |$result
          |""".stripMargin)
     

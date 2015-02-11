@@ -337,7 +337,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val result = handlerCreationQuote(c)(tpe)("json")("args")
 //    println(
 //      s"""
-//         |formatter
+//         |FormatterMaterializerImpl.materialize()
 //         |$result
 //       """.stripMargin)
     c.Expr[JsonFormatter[T]](result)

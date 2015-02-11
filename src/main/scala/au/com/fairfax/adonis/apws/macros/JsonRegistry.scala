@@ -61,7 +61,7 @@ class BaseJsonRegistry extends JsonRegistry {
 //       """.stripMargin)
   }
 
-  def newRegister[T](implicit regHelper: RegisterHelper[T]): Unit = {
+  def newRegister[T](implicit regHelper: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val (genParers, genFormatters) = regHelper.traversableRegister
     parsers ++= genParers
     formatters ++= genFormatters
