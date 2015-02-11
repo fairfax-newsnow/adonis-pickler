@@ -61,6 +61,20 @@ class BaseJsonRegistry extends JsonRegistry {
 //       """.stripMargin)
   }
 
+  def newRegister[T](implicit regHelper: RegisterHelper[T]): Unit = {
+    val (genParers, genFormatters) = regHelper.traversableRegister
+    parsers ++= genParers
+    formatters ++= genFormatters
+    println(
+      s"""
+         |newRegister()
+         |parsers = 
+         |$parsers
+         |formatters = 
+         |$formatters
+       """.stripMargin)
+  }
+
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
     formatters.get(if (key == "T") toMapKey(className[T]) else key).fold {
