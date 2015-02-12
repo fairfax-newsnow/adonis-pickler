@@ -44,38 +44,35 @@ class BaseJsonRegistry extends JsonRegistry {
 
   def register[T](implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
     val key = keyProvider.key
-//    parsers ++= (parser.buildChildParsers + (key -> parser))
     parsers += (key -> parser)
-//    formatters ++= (formatter.buildChildFormatters + (key -> formatter))
     formatters += (key -> formatter)
-    
-//    println(
-//      s"""
-//         |parser.buildChildParsers =
-//         |${parser.buildChildParsers} =
-//         |(key -> parser)
-//         |${(key -> parser)}
-//         |formatter.buildChildFormatters =
-//         |${formatter.buildChildFormatters}
-//         |$formatters
-//       """.stripMargin)
   }
-
-  def newRegister[T](implicit regHelper: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]) = {
-    val (genParers, genFormatters) = regHelper.traversableRegister
-    parsers ++= genParers
-    formatters ++= genFormatters
-    (parsers, formatters)
-//    println(
-//      s"""
-//         |newRegister()
-//         |parsers =
-//         |$parsers
-//         |formatters =
-//         |$formatters
-//       """.stripMargin)
+  
+  def registerNew[T](implicit transversableReg: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit =
+    if (!alreadyRegistered[T])
+      transversableReg.traversableRegister
+  
+  def add(parser: (String, JsonParser[_]))(formatter: (String, JsonFormatter[_])): Unit = {
+    parsers += (parser._1 -> parser._2)
+    formatters += (formatter._1 -> formatter._2)
+    println(
+      s"""
+         |add(),
+         |parsers = $parsers
+         |formatters = $formatters
+       """.stripMargin)
   }
+  
+  def alreadyRegistered[T](implicit keyProvider: TypeKeyProvider[T]): Boolean =
+    parsers contains (keyProvider.key)
 
+//  def registerTest[T](b: Boolean)(implicit regHelper: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]) = {
+//    val (genParers, genFormatters) = regHelper.traversableRegisterTest(b)
+//    parsers ++= genParers
+//    formatters ++= genFormatters
+//    (parsers, formatters)
+//  }
+  
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
     formatters.get(if (key == "T") toMapKey(className[T]) else key).fold {
