@@ -6,7 +6,7 @@ import scala.reflect.macros.blackbox.Context
 trait RegisterHelper[T] {
   //def traversableRegisterTest(b: Boolean)(implicit parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): (String Map JsonParser[_], String Map JsonFormatter[_])
   
-  def traversableRegister(implicit parser: JsonParser[T], formatter: JsonFormatter[T]): Unit
+  def traversableRegister: Unit
 }
 
 object RegisterHelper {
@@ -25,16 +25,14 @@ object RegisterHelper {
         import au.com.fairfax.adonis.apws.macros.JsonRegistry
 
         implicit object GenRegisterHelper extends RegisterHelper[${tpe.dealias}] {
-          def traversableRegister(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]): Unit = {
-              JsonRegistry.add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
-              
-              if (JsonRegistry.alreadyRegistered[${TypeName(intStr)}]) {
-                println("GenRegisterHelper: already registered, don't need to call JsonRegistry.register again!!!")
-              } else {
-                println("GenRegisterHelper: not registered yet, got to call JsonRegistry.register again!!!")
-                JsonRegistry.registerNew[${TypeName(intStr)}]
-              }
+          def traversableRegister: Unit = {
+            /*register*/
           }
+          
+          private def register(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]) {
+            add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
+          }
+          
         }
         
         GenRegisterHelper

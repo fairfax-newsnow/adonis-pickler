@@ -48,7 +48,7 @@ class BaseJsonRegistry extends JsonRegistry {
     formatters += (key -> formatter)
   }
   
-  def registerNew[T](implicit transversableReg: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]): Unit = {
+  def registerNew[T](implicit transversableReg: RegisterHelper[T], keyProvider: TypeKeyProvider[T]): Unit = {
     println("JsonRegistry.registerNew!!")
     if (!alreadyRegistered[T]) {
       println("JsonRegistry.registerNew(), not in memory yet, got to call transversableReg.traversableRegister")
