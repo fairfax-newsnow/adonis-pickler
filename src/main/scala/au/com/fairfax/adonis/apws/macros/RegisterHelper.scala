@@ -15,7 +15,7 @@ object RegisterHelper {
   def materialize[T: c.universe.WeakTypeTag](c: Context): c.Expr[RegisterHelper[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val tpeStr = tpe.dealias.toString
+    val intStr = "Int"
     val result =
       q"""
         import au.com.fairfax.adonis.apws.macros.RegisterHelper
@@ -28,11 +28,11 @@ object RegisterHelper {
           def traversableRegister(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]): Unit = {
               JsonRegistry.add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
               
-              if (JsonRegistry.alreadyRegistered[Int]) {
+              if (JsonRegistry.alreadyRegistered[${TypeName(intStr)}]) {
                 println("GenRegisterHelper: already registered, don't need to call JsonRegistry.register again!!!")
               } else {
                 println("GenRegisterHelper: not registered yet, got to call JsonRegistry.register again!!!")
-                JsonRegistry.registerNew[Int]
+                JsonRegistry.registerNew[${TypeName(intStr)}]
               }
           }
         }
