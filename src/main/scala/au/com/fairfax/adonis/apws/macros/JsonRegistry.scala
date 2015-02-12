@@ -35,13 +35,14 @@ object MacroObject {
     val tpe = weakTypeOf[T]
 //    q"if($a > $b) $a else $b"
     println(s"tpe = $tpe")
+    val anotherTpe = "Double"
     
     val result =
     q"""
         implicit object GenTraversableRegLoader extends TraversableRegLoader {
           def loadRegistrator: Unit = register
           
-          private def register(implicit traversableReg: TraversableRegistrar[$tpe]): Unit = {
+          private def register(implicit traversableReg: TraversableRegistrar[${TypeName(anotherTpe)}]): Unit = {
           }
         }
         
