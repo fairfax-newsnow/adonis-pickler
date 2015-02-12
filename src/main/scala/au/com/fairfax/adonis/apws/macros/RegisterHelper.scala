@@ -25,7 +25,7 @@ object RegisterHelper {
 
         implicit object GenRegisterHelper extends RegisterHelper[${tpe.dealias}] {
           def traversableRegister(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]): Unit = {
-              JsonRegistry.add(("String", parser))(("String", formatter))
+              JsonRegistry.add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
           }
         }
         
