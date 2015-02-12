@@ -28,11 +28,11 @@ object RegisterHelper {
           def traversableRegister(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]): Unit = {
               JsonRegistry.add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
               
-              if (JsonRegistry.alreadyRegistered[${tpe.dealias}]) {
+              if (JsonRegistry.alreadyRegistered[Int]) {
                 println("GenRegisterHelper: already registered, don't need to call JsonRegistry.register again!!!")
               } else {
                 println("GenRegisterHelper: not registered yet, got to call JsonRegistry.register again!!!")
-                JsonRegistry.register[${tpe.dealias}]
+                JsonRegistry.registerNew[Int]
               }
           }
         }
