@@ -26,6 +26,37 @@ trait JsonRegistry extends TypeProvider {
   def parse[J](json: J)(implicit reader: JReader[J]): Any
 }
 
+object MacroObject {
+  def maximum[T]: TraversableRegLoader =
+  macro maximumMacro[T]
+
+  def maximumMacro[T: c.universe.WeakTypeTag](c: Context): c.Expr[TraversableRegLoader] = {
+    import c.universe._
+    val tpe = weakTypeOf[T]
+//    q"if($a > $b) $a else $b"
+    println(s"tpe = $tpe")
+    
+    val result =
+    q"""
+        implicit object GenTraversableRegLoader extends TraversableRegLoader {
+          def loadRegistrator: Unit = register
+          
+          private def register(implicit traversableReg: TraversableRegistrar[$tpe]): Unit = {
+          }
+        }
+        
+        GenTraversableRegLoader
+    """
+    println(result)
+    c.Expr[TraversableRegLoader](result)
+  }
+
+}
+
+trait TraversableRegLoader {
+  def loadRegistrator: Unit
+}
+
 class BaseJsonRegistry extends JsonRegistry {
 
   private val parsers = new MHashMap[String, JsonParser[_]]
@@ -48,14 +79,14 @@ class BaseJsonRegistry extends JsonRegistry {
     formatters += (key -> formatter)
   }
   
-  def registerNew[T](implicit transversableReg: RegisterHelper[T], keyProvider: TypeKeyProvider[T]): Unit = {
-    println("JsonRegistry.registerNew!!")
-    if (!alreadyRegistered[T]) {
-      println("JsonRegistry.registerNew(), not in memory yet, got to call transversableReg.traversableRegister")
-      transversableReg.traversableRegister
-    } else {
-      println("JsonRegistry.registerNew(), in memory already, no need to call transversableReg.traversableRegister")
-    }
+  def registerNew[T](implicit typeKeyProvider: TypeKeyProvider[T], traversableReg: TraversableRegistrar[T]): Unit = {
+    typeKeyProvider.key
+    println(s"JsonRegistry.registerNew() for ${typeKeyProvider.key}!!")
+//    if (!(parsers contains typeKeyProvider.key)) {
+//      println("JsonRegistry.registerNew(), not in memory yet, got to call transversableReg.traversableRegister")
+//    } else {
+//      println("JsonRegistry.registerNew(), in memory already, no need to call transversableReg.traversableRegister")
+//    }
   }
   
   def add(parser: (String, JsonParser[_]))(formatter: (String, JsonFormatter[_])): Unit = {
@@ -69,8 +100,13 @@ class BaseJsonRegistry extends JsonRegistry {
        """.stripMargin)
   }
   
-  def alreadyRegistered[T](implicit keyProvider: TypeKeyProvider[T]): Boolean =
-    parsers contains (keyProvider.key)
+  def alreadyRegistered(key: String): Boolean = {
+    println(s"JsonRegistry.alreadyRegistered($key), parsers = $parsers")
+    parsers contains key
+  }
+  
+//  def alreadyRegistered(typeKey: String): Boolean =
+//    parsers contains typeKey
 
 //  def registerTest[T](b: Boolean)(implicit regHelper: RegisterHelper[T], parser: JsonParser[T], formatter: JsonFormatter[T], keyProvider: TypeKeyProvider[T]) = {
 //    val (genParers, genFormatters) = regHelper.traversableRegisterTest(b)
