@@ -31,34 +31,11 @@ object TraversableRegistrar {
 
     val result =
       if (RegistrarMacroTracker contains tpeStr) {
-        q"""
-          import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
-
-          implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe.dealias}] {
-            def traversableRegister: Unit = {}
-          }
-
-          GenTraversableRegistrar
-        """
+        alreadyRegisteredQuote(c)(tpe)
       }
       else {
         RegistrarMacroTracker add tpeStr
-        q"""
-          import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
-          import au.com.fairfax.adonis.apws.macros.JsonParser
-          import au.com.fairfax.adonis.apws.macros.JsonFormatter
-          import au.com.fairfax.adonis.apws.macros.JsonRegistry
-
-          implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe.dealias}] {
-            def traversableRegister: Unit = register
-
-            private def register(implicit parser: JsonParser[${tpe.dealias}], formatter: JsonFormatter[${tpe.dealias}]) {
-              add((${tpe.dealias.toString}, parser))((${tpe.dealias.toString}, formatter))
-            }
-          }
-
-          GenTraversableRegistrar
-        """
+        yetToRegisterQuote(c)(tpe)
       }
     
     println(
@@ -68,5 +45,38 @@ object TraversableRegistrar {
        """.stripMargin)
     
     c.Expr[TraversableRegistrar[T]](result)
+  }
+  
+  private def alreadyRegisteredQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"""
+      import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
+
+      implicit object RegistrarDoesNothing extends TraversableRegistrar[${tpe}] {
+        def traversableRegister: Unit = {}
+      }
+
+      RegistrarDoesNothing
+    """
+  }
+
+  private def yetToRegisterQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"""
+      import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
+      import au.com.fairfax.adonis.apws.macros.JsonParser
+      import au.com.fairfax.adonis.apws.macros.JsonFormatter
+      import au.com.fairfax.adonis.apws.macros.JsonRegistry
+      
+      implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe}] {
+        def traversableRegister: Unit = register
+
+        private def register(implicit parser: JsonParser[${tpe}], formatter: JsonFormatter[${tpe}]) {
+          add((${tpe.toString}, parser))((${tpe.toString}, formatter))
+        }
+      }
+
+      GenTraversableRegistrar
+    """
   }
  }
