@@ -29,6 +29,9 @@ import au.com.fairfax.adonis.utils.simpleTypeNm
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
+  def concatVarNms(varNms: String*): String =
+    varNms mkString "_"
+
   /**
    * Qutoe of method definition that parse an Item, it will be something like
    * def $methodNm(item: J) = ???
@@ -390,43 +393,22 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val result = handlerCreationQuote(c)(tpe)("json")("args")
+    val result =
+      q"""
+      implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
+        override def parse[J](json: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
+          def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
+          ${recurQuote(c)(tpe.dealias)("json")("args")(true)}
+        }
+      }
+
+      GenJsonParser
+    """
 //    println(
 //      s"""
 //         |ParserMaterializerImpl.materialize()
 //         |$result
 //       """.stripMargin)
     c.Expr[JsonParser[T]](result)
-  }
-
-  /**
-   * a template that returns quote that generate a JsonParser or JsonFormatter
-   */
-  def handlerCreationQuote(c: Context)(tpeBeHandled: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
-    import c.universe._
-//    q"""
-//      implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpeBeHandled.dealias}] {
-//        override def parse[J](${TermName(objNm)}: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
-//          def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
-//          ${recurQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)(true)}
-//        }
-//
-//        override def buildChildParsers: String Map au.com.fairfax.adonis.apws.macros.JsonParser[_] = {
-//          ${childHandlerersQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)}
-//        }
-//      }
-//
-//      GenJsonParser
-//    """
-    q"""
-      implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpeBeHandled.dealias}] {
-        override def parse[J](${TermName(objNm)}: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
-          def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
-          ${recurQuote(c)(tpeBeHandled.dealias)(objNm)(fieldNm)(true)}
-        }
-      }
-
-      GenJsonParser
-    """
   }
 }
