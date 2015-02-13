@@ -27,13 +27,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def jsonIo(c: Context): c.universe.TermName
 
-  def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
-
-  def collTypes(c: Context) = {
-    import c.universe._
-    List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm(c)
-  }
-
   def deliasTpeName[T: c.universe.TypeTag](c: Context): String =
     c.universe.typeOf[T].dealias.toString
 

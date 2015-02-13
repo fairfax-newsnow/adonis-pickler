@@ -10,4 +10,11 @@ package object macros {
     }.toList
   }
 
+  def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
+
+  def collTypes(c: Context) = {
+    import c.universe._
+    List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm(c)
+  }
+
 }

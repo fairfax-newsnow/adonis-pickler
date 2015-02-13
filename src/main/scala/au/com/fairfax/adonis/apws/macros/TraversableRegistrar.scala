@@ -73,7 +73,7 @@ object TraversableRegistrar {
 
         private def registerParserFormatter(implicit parser: JsonParser[${tpe}], formatter: JsonFormatter[${tpe}]) {
           add((${tpe.toString}, parser))((${tpe.toString}, formatter))
-          ${traverseChildren(c)(tpe)}
+          ${traverseChildrenQuote(c)(tpe)}
         }
       }
 
@@ -81,25 +81,32 @@ object TraversableRegistrar {
     """
   }
 
-  private def traverseChildren(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+  private def traverseChildrenQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
 
     lazy val accessors: List[MethodSymbol] = getAccessors(c)(tpe)
 
     tpe match {
+      // a collection type
+      case collectionTpe: Type if collTypes(c) contains tpeClassNm(c)(collectionTpe) =>
+        val itemTpe = collectionTpe.typeArgs.head
+        registerToRegistryQuote(c)(itemTpe)
+
+      // a structured type 
       case _ if accessors.nonEmpty =>
-        val accessorQuotes =
-          accessors map {
-            accessor =>
-              val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
-              q"JsonRegistry.registerNew[$accessorTpe]"
-          }
+        val accessorQuotes = accessors map {
+          accessor =>
+            val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+            registerToRegistryQuote(c)(accessorTpe)
+        }
         q"..$accessorQuotes"
       case _ => q"()"
 
     }
-
   }
 
-
+  private def registerToRegistryQuote(c: Context)(registerTpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"JsonRegistry.registerNew[$registerTpe]"
+  }
 }
