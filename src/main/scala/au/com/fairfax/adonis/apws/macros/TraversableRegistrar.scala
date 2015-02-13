@@ -10,7 +10,7 @@ object RegistrarMacroTracker {
     registeredTypes += t
     println(s"$RegistrarMacroTracker.add(), registeredTypes = $registeredTypes")
   }
-  
+
   def contains(t: String): Boolean = {
     println(s"$RegistrarMacroTracker.contains($t), registeredTypes = $registeredTypes")
     registeredTypes contains t
@@ -37,16 +37,16 @@ object TraversableRegistrar {
         RegistrarMacroTracker add tpeStr
         yetToRegisterQuote(c)(tpe)
       }
-    
+
     println(
       s"""
          |TraversableRegistrar.materialize(), result =
          |$result
        """.stripMargin)
-    
+
     c.Expr[TraversableRegistrar[T]](result)
   }
-  
+
   private def alreadyRegisteredQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     q"""
@@ -69,14 +69,37 @@ object TraversableRegistrar {
       import au.com.fairfax.adonis.apws.macros.JsonRegistry
       
       implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe}] {
-        def traversableRegister: Unit = register
+        def traversableRegister: Unit = registerParserFormatter
 
-        private def register(implicit parser: JsonParser[${tpe}], formatter: JsonFormatter[${tpe}]) {
+        private def registerParserFormatter(implicit parser: JsonParser[${tpe}], formatter: JsonFormatter[${tpe}]) {
           add((${tpe.toString}, parser))((${tpe.toString}, formatter))
+          ${traverseChildren(c)(tpe)}
         }
       }
 
       GenTraversableRegistrar
     """
   }
- }
+
+  private def traverseChildren(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+
+    lazy val accessors: List[MethodSymbol] = getAccessors(c)(tpe)
+
+    tpe match {
+      case _ if accessors.nonEmpty =>
+        val accessorQuotes =
+          accessors map {
+            accessor =>
+              val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+              q"JsonRegistry.registerNew[$accessorTpe]"
+          }
+        q"..$accessorQuotes"
+      case _ => q"()"
+
+    }
+
+  }
+
+
+}

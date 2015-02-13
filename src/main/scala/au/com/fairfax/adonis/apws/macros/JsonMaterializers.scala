@@ -50,13 +50,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
-    import c.universe._
-    tpe.decls.collect {
-      case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
-    }.toList
-  }
-
   def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
 
