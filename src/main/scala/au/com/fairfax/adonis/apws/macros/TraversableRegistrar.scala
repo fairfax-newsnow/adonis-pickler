@@ -28,7 +28,7 @@ object TraversableRegistrar {
     import c.universe._
     val tpe = weakTypeOf[T]
     val tpeStr = toMapKey(tpe.toString)
-    
+
     println(s"TraversableRegistrar.materialize(), tpe = $tpe, tpeStr = $tpeStr")
 
     val result =
@@ -93,7 +93,7 @@ object TraversableRegistrar {
       case collectionTpe: Type if collTypes(c) contains tpeClassNm(c)(collectionTpe) =>
         val itemTpe = collectionTpe.typeArgs.head
         registerToRegistryQuote(c)(itemTpe)
-        
+
       // a map type
       case mapTpe: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(mapTpe) =>
         val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
@@ -118,6 +118,13 @@ object TraversableRegistrar {
           ${registerToRegistryQuote(c)(rightTpe)}
         """
 
+      // a sealed trait
+      case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
+        val childrenQuotes = getSealedTraitChildren(c)(traitTpe).withFilter(!hasNoAccessor(c)(_)) map {
+          registerToRegistryQuote(c)(_)
+        }
+        q"..$childrenQuotes"
+
       // a structured type
       case _ if accessors.nonEmpty =>
         val accessorQuotes = accessors map {
@@ -126,7 +133,7 @@ object TraversableRegistrar {
             registerToRegistryQuote(c)(accessorTpe)
         }
         q"..$accessorQuotes"
-        
+
       case _ => q"()"
     }
   }

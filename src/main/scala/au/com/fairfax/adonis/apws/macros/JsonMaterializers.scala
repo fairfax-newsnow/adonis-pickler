@@ -43,9 +43,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
-    getAccessors(c)(tpe).isEmpty
-
   /**
    * Quote to handle a collection
    */
@@ -197,9 +194,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a sealed trait
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val childTypes = traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
-          des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
-        }.map(_.asInstanceOf[Symbol].asType.toType)
+        val childTypes = getSealedTraitChildren(c)(traitTpe)
 
         val onlyCaseObjects = childTypes forall hasNoAccessor(c)
 

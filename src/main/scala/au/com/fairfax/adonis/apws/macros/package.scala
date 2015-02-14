@@ -6,6 +6,9 @@ import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox.Context
 
 package object macros {
+  def hasNoAccessor(c: Context)(tpe: c.universe.Type): Boolean =
+    getAccessors(c)(tpe).isEmpty
+
   def getAccessors(c: Context)(tpe: c.universe.Type): List[c.universe.MethodSymbol] = {
     import c.universe._
     tpe.decls.collect {
@@ -40,4 +43,11 @@ package object macros {
         val (key, value) = tuple
         origStr.replaceAll(key,value)
     }
+  
+  def getSealedTraitChildren(c: Context)(traitTpe: c.universe.Type): Set[c.universe.Type] = {
+    import c.universe._
+    traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].sealedDescendants.filterNot {
+      des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
+    }.map(_.asInstanceOf[Symbol].asType.toType)
+  }
 }
