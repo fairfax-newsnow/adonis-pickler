@@ -106,7 +106,18 @@ object TraversableRegistrar {
       case optionTpe: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(optionTpe) =>
         val itemTpe = optionTpe.typeArgs.head
         registerToRegistryQuote(c)(itemTpe)
-        
+
+      // an either type
+      case eitherTpe: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(eitherTpe) =>
+        val leftTpe = eitherTpe.dealias.typeArgs.head
+        println(s"leftTpe = $leftTpe")
+        val rightTpe = eitherTpe.dealias.typeArgs.last
+        println(s"rightTpe = $rightTpe")
+        q"""
+          ${registerToRegistryQuote(c)(leftTpe)}
+          ${registerToRegistryQuote(c)(rightTpe)}
+        """
+
       // a structured type
       case _ if accessors.nonEmpty =>
         val accessorQuotes = accessors map {
