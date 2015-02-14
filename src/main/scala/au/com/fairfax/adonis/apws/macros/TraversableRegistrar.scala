@@ -102,7 +102,12 @@ object TraversableRegistrar {
           ${registerToRegistryQuote(c)(valTpe)}
         """
 
-      // a structured type 
+      // an option type
+      case optionTpe: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(optionTpe) =>
+        val itemTpe = optionTpe.typeArgs.head
+        registerToRegistryQuote(c)(itemTpe)
+        
+      // a structured type
       case _ if accessors.nonEmpty =>
         val accessorQuotes = accessors map {
           accessor =>
@@ -110,8 +115,8 @@ object TraversableRegistrar {
             registerToRegistryQuote(c)(accessorTpe)
         }
         q"..$accessorQuotes"
+        
       case _ => q"()"
-
     }
   }
 
