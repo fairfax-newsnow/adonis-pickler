@@ -1,5 +1,8 @@
 package au.com.fairfax.adonis.apws
 
+import au.com.fairfax.adonis.utils._
+
+import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox.Context
 
 package object macros {
@@ -17,4 +20,24 @@ package object macros {
     List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm(c)
   }
 
+  lazy val strConversion: String Map String =
+    (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
+      s => s -> s.capitalize
+    } ::: List(className[String]).map{
+      s => s -> simpleTypeNm(s)
+    }).toMap
+  
+  lazy val strReplacement: String Map String =
+    List(className[Map[_, _]]).map {
+      s => s -> simpleTypeNm(s)
+    }.toMap
+
+  def className[T: ClassTag] = implicitly[ClassTag[T]].runtimeClass.getName
+
+  def toMapKey(s: String): String =
+    strReplacement.foldLeft(strConversion.getOrElse(s, s).replace('$', '.')) {
+      (origStr, tuple) =>
+        val (key, value) = tuple
+        origStr.replaceAll(key,value)
+    }
 }

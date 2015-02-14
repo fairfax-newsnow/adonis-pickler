@@ -27,7 +27,9 @@ object TraversableRegistrar {
   def materialize[T: c.universe.WeakTypeTag](c: Context): c.Expr[TraversableRegistrar[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val tpeStr = tpe.toString
+    val tpeStr = toMapKey(tpe.toString)
+    
+    println(s"TraversableRegistrar.materialize(), tpe = $tpe, tpeStr = $tpeStr")
 
     val result =
       if (RegistrarMacroTracker contains tpeStr) {
@@ -35,7 +37,7 @@ object TraversableRegistrar {
       }
       else {
         RegistrarMacroTracker add tpeStr
-        yetToRegisterQuote(c)(tpe)
+        yetToRegisterQuote(c)(tpe)(tpeStr)
       }
 
     println(
@@ -60,7 +62,7 @@ object TraversableRegistrar {
     """
   }
 
-  private def yetToRegisterQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+  private def yetToRegisterQuote(c: Context)(tpe: c.universe.Type)(keyBeAdded: String): c.universe.Tree = {
     import c.universe._
     q"""
       import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
@@ -72,7 +74,7 @@ object TraversableRegistrar {
         def traversableRegister: Unit = registerParserFormatter
 
         private def registerParserFormatter(implicit parser: JsonParser[${tpe}], formatter: JsonFormatter[${tpe}]) {
-          add((${tpe.toString}, parser))((${tpe.toString}, formatter))
+          add(($keyBeAdded, parser))(($keyBeAdded, formatter))
           ${traverseChildrenQuote(c)(tpe)}
         }
       }
@@ -91,6 +93,14 @@ object TraversableRegistrar {
       case collectionTpe: Type if collTypes(c) contains tpeClassNm(c)(collectionTpe) =>
         val itemTpe = collectionTpe.typeArgs.head
         registerToRegistryQuote(c)(itemTpe)
+        
+      // a map type
+      case mapTpe: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(mapTpe) =>
+        val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
+        q"""
+          ${registerToRegistryQuote(c)(keyTpe)}
+          ${registerToRegistryQuote(c)(valTpe)}
+        """
 
       // a structured type 
       case _ if accessors.nonEmpty =>
