@@ -41,7 +41,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote to handle a map
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree
 
   /**
    * Quote to handle a collection
@@ -175,14 +175,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>
-        val (List(keyTpe, valTpe), List(keyMeth, valMeth)) = t.dealias.typeArgs.map {
-          t => (t, methdNameOfHandleItem(t.toString))
-        }.unzip
-        val itemQuotes = quoteOfHandleItemDef(c)(keyTpe)(keyMeth) :: {
-          if (keyTpe != valTpe) List(quoteOfHandleItemDef(c)(valTpe)(valMeth))
-          else Nil
-        }
-        mapQuote(c)(objNm)(fieldNm)((keyTpe, valTpe))((keyMeth, valMeth))(itemQuotes)
+        mapQuote(c)(objNm)(fieldNm)(t)
 
       // an option type
       case t: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(t) =>

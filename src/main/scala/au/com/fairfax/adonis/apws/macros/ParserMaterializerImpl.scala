@@ -51,9 +51,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * def parseMap(map: J) = ???
    * parseMap(reader.readObjectField(objNm, s"$fieldNm"))
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val (keyTpe, valTpe) = kvTpes
+    val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
     val parseMapMethNm = TermName("parseMap")
     q"""
       def $parseMapMethNm(map: J) = ${
@@ -80,7 +80,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
+
     val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
@@ -89,7 +89,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
               JsonRegistry.parse(jsonItem, "", Some(${itemTpe.toString})).asInstanceOf[$itemTpe]
           }
       """
-
     // if it's not Seq but, say, List, append .toList to the quote
     val toCollQuote =
       if (collType == tpeClassNm(c)(typeOf[Seq[_]]))

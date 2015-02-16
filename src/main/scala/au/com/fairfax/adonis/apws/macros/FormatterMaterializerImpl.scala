@@ -59,10 +59,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def formatMap(map: K Map V) = ???
    * formatMap(objNm)
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val (keyTpe, valTpe) = kvTpes
-    val (keyMeth, valMeth) = kvMeths
+    val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
 
     val formatMapMethNm = TermName("formatMap")
     q"""
