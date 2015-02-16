@@ -1,7 +1,5 @@
 package au.com.fairfax.adonis.apws.macros
 
-import au.com.fairfax.adonis.apws.macros.ParserMaterializerImpl._
-
 import scala.reflect.macros.blackbox.Context
 import au.com.fairfax.adonis.utils.simpleTypeNm
 import Materializer._
@@ -36,22 +34,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   private def toJsonStringQuote(c: Context)(s: String): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.makeString($s)"
-  }
-
-  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    itemQuoteTemplate(c)(itemTpe)(methodNm) {
-      recurQuote(c)(itemTpe)(_)("")(false)
-    }
-  }
-
-  private def itemQuoteTemplate(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(quoteFunc: String => c.universe.Tree): c.universe.Tree = {
-    import c.universe._
-    val varName = "obj"
-    q"""
-      def $methodNm(${TermName(varName)}: $tpe) =
-        ${quoteFunc(varName)}
-    """
   }
 
   /**
@@ -245,14 +227,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    itemQuoteTemplate(c)(ct)(method) {
-      varName =>
-        val ctsTypeName = simpleTypeNm(ct.toString)
-        val accessorQuotes =
-          List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)} """)
-        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
+    val objNm = TermName("obj")
+    val methImplQuote = structuredTypeQuote(c)(ct)(objNm.toString)(fieldNm) {
+      List(
+        q""" "t" -> ${toJsonStringQuote(c)(simpleTypeNm(ct.toString))} """,
+        q""" "v" -> JsonRegistry.format($objNm, ${fieldNm.toString}, false) """)
     }
+    
+    q"def $method($objNm: $ct) = $methImplQuote"
   }
 
   private lazy val varBeMatched = "obj"
@@ -305,10 +287,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
-  }
+//  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
+//    import c.universe._
+//    q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
+//  }
 
   /**
    * Quote to format an enum object, it should be something like

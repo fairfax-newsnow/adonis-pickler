@@ -36,7 +36,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Qutoe of method definition that handle an Item
    */
-  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
+//  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle a map
@@ -137,7 +137,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree
+//  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle an enum object
@@ -152,8 +152,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         enumObjQuote(c)(t)(objNm)(fieldNm)
 
-      case t: Type if t <:< c.mirror.typeOf[JsSerialisable] && !firstRun =>
-        jsSerialisableQuote(c)(t)(objNm)(fieldNm)
+//      case t: Type if t <:< c.mirror.typeOf[JsSerialisable] && !firstRun =>
+//        jsSerialisableQuote(c)(t)(objNm)(fieldNm)
 
       // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>

@@ -33,20 +33,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     varNms mkString "_"
 
   /**
-   * Qutoe of method definition that parse an Item, it will be something like
-   * def $methodNm(item: J) = ???
-   * 
-   * Note: don't declare return type after def ${TermName(createItemMeth)}(item: J), o.w. will get meaningless error of type XXX not found in macro call
-   */
-  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"""
-      def $methodNm(item: ${TypeName("J")}) =
-        ${recurQuote(c)(itemTpe)("item")("")(false)}
-    """
-  }
-
-  /**
    * Quote to parse a map, it will be something like
    * def parseMap(map: J) = ???
    * parseMap(reader.readObjectField(objNm, s"$fieldNm"))
@@ -295,7 +281,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
-      def $method(item: ${TypeName("J")}) = JsonRegistry.parse(item, "", Some(${ct.toString})).asInstanceOf[$ct]
+      def $method(item: ${TypeName("J")}) = 
+        JsonRegistry.parse(item, "", Some(${ct.toString})).asInstanceOf[$ct]
     """
   }
 
@@ -359,10 +346,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
-  }
+//  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
+//    import c.universe._
+//    q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
+//  }
 
   /**
    * Quote to parse an enum object, it should be something like, e.g.
@@ -402,7 +389,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           import au.com.fairfax.adonis.apws.macros.JReader
           
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
-            def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)
+            /*def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)*/
             ${recurQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))(true)}
           }
         }
