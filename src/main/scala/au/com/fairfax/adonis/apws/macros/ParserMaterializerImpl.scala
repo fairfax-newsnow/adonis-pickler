@@ -42,7 +42,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     import c.universe._
     q"""
       def $methodNm(item: ${TypeName("J")}) =
-        ${recurQuote(c)(itemTpe)("item")("")(false)}
+        ${recurQuote(c)(itemTpe)("item")("")(false)(???)}
     """
   }
 
@@ -51,7 +51,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * def parseMap(map: J) = ???
    * parseMap(reader.readObjectField(objNm, s"$fieldNm"))
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val(keyMeth, valMeth) = kvMeths
     val parseMapMethNm = TermName("parseMap")
@@ -79,7 +79,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * def parseCollection(array: J) = ???
    * parseCollection(reader.readObjectField(objNm, s"$fieldNm"))
    */
-  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
+  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
     val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val intsToItemsQuote =
@@ -136,11 +136,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * else  
    *  parseOption(obj_field)
    */
-  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val parseOptionMethdNm = TermName("parseOption")
-    val optField = TermName(concatVarNms(objNm.toString, fieldNm))
+    val optField = TermName(concatVarNms(objNm.toString, fieldNm.toString))
     q"""
       def $parseOptionMethdNm(json: J): Option[$itemTpe] = {
         ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
@@ -164,7 +164,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * def parseEither(json: J): Either[LEFT, RIGHT] = ???
    * parseEither(reader.readObjectField(objNm, s"$fieldNm"))
    */
-  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree = {
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
@@ -198,7 +198,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
    */
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     val quote = q"${jsonIo(c)}.readNumber(${fieldQuote(c)(objNm)(fieldNm)})"
     if (tpe == typeOf[Double])
@@ -216,14 +216,14 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *  reader.readString(objNm_fieldNm)
    * }
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
     import c.universe._
-    val varBeChecked = TermName(concatVarNms(objNm.toString, fieldNm))
+    val assignedVar = TermName(concatVarNms(objNm.toString, fieldNm.toString))
     q"""
-      val $varBeChecked = ${fieldQuote(c)(objNm)(fieldNm)}
+      val $assignedVar = $quoteToAccessField
       ${
-        quoteWithNullCheck(c)(varBeChecked) {
-          q"${jsonIo(c)}.readString($varBeChecked)"
+        quoteWithNullCheck(c)(assignedVar) {
+          q"${jsonIo(c)}.readString($assignedVar)"
         }
       }
     """
@@ -236,7 +236,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
    */
-  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.readBoolean(${fieldQuote(c)(objNm)(fieldNm)})"
   }
@@ -256,22 +256,24 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * if the field name is "", objNm is the field, therefore return objNm
    * o.w. return reader.readObjectField(objNm, s"$fieldNm")
    */
-  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    if (fieldNm == "")
+    if (fieldNm.toString == "")
       q"$objNm"
     else
-      q"${jsonIo(c)}.readObjectField($objNm, $fieldNm)"
+      q"${jsonIo(c)}.readObjectField($objNm, ${fieldNm.toString})"
   }
 
-  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree =
-    recurQuote(c)(accessorTpe)(concatVarNms(objNm, fieldNm))(accessorField)(false)
-
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    val assignedVar = concatVarNms(objNm, fieldNm)
+    q"JsonRegistry.parse(${TermName(concatVarNms(objNm, fieldNm.toString))}, ${accessorField.toString}, Some(${accessorTpe.toString})).asInstanceOf[$accessorTpe]"
+  }
+
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+    import c.universe._
+    val assignedVar = concatVarNms(objNm, fieldNm.toString)
     q"""
-      val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
+      val ${TermName(assignedVar)} = $quoteToAccessField
       ${
         quoteWithNullCheck(c)(varOfNullCheck = assignedVar) {
           q"new $tpe(..$accessorQuotes)"
@@ -294,7 +296,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * Quote of method definition that creates an case class object of type ct, it will be seomthing like
    * def $methodNm(item: J) = ???
    */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree =
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree =
     quoteOfHandleItemDef(c)(ct)(method)
 
   /**
@@ -348,7 +350,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * def handle_TRAITTYPE_traitFamily(objNm: J) = ???
    * handle_TRAITTYPE_traitFamily(reader.readObjectField(objNm, s"$fieldNm"))
    */
-  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree = {
+  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
     q"""
@@ -357,7 +359,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
   }
@@ -374,7 +376,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * }
    * au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum(values.this.StoryStatus.Value, caseEnumName)
    */
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
 
     val companion = {
@@ -385,7 +387,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     }
 
     q"""
-      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)}
+      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)(???)}
       au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
@@ -393,22 +395,27 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
+    val quoteToAccessField = q"${jsonIo(c)}.readObjectField(json, nameOfParsedField)"
     val result =
       q"""
-      implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
-        override def parse[J](json: J)(implicit ${jsonIo(c)}:  au.com.fairfax.adonis.apws.macros.JReader[J]) = {
-          def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised)
-          ${recurQuote(c)(tpe.dealias)("json")("args")(true)}
+        implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
+          import au.com.fairfax.adonis.apws.macros.JsonRegistry
+          import au.com.fairfax.adonis.apws.macros.JReader
+          
+          override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
+            def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)
+            println("inside GenJsonParser.parse(), json = " + json + ", nameOfParsedField = " + nameOfParsedField)
+            ${recurQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))(true)(quoteToAccessField)}
+          }
         }
-      }
-
-      GenJsonParser
-    """
-//    println(
-//      s"""
-//         |ParserMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
+  
+        GenJsonParser
+      """
+    println(
+      s"""
+         |ParserMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
     c.Expr[JsonParser[T]](result)
   }
 }

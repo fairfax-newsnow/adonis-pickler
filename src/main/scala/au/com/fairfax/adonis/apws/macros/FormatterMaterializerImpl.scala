@@ -39,8 +39,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   }
 
   def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
+    import c.universe._
     itemQuoteTemplate(c)(itemTpe)(methodNm) {
-      recurQuote(c)(itemTpe)(_)("")(false)
+      recurQuote(c)(itemTpe)(_)("")(false)(???)
     }
   }
 
@@ -58,7 +59,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def formatMap(map: K Map V) = ???
    * formatMap(objNm)
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val (keyTpe, valTpe) = kvTpes
     val (keyMeth, valMeth) = kvMeths
@@ -87,7 +88,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def formatCollection(objList: Seq[ITEM]) = ???
    * formatCollection(objNm)
    */
-  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
+  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
     val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val formatCollMethNm = TermName("formatCollection")
@@ -110,7 +111,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def formatOption(opt: Option[ITEM]) = ???
    * formatOption(objNm)
    */
-  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree = {
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val caseQuotes = List(
@@ -134,7 +135,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def formatEither(either: Either[LEFT, RIGHT]) = ???
    * formatEither(objNm)
    */
-  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree = {
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
@@ -165,7 +166,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
    */
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     val numQuote =
       if (tpe == typeOf[Double]) q"$objNm"
@@ -181,7 +182,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *  builder.makeString(objNm)
    * }
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     q"""
       ${
@@ -198,7 +199,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
    */
-  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.makeBoolean(${fieldQuote(c)(objNm)(fieldNm)})"
   }
@@ -217,20 +218,24 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * Quote that format the field on that object.
    * return objNm
    */
-  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"$objNm"
   }
 
-  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree = {
+  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
-      val ${TermName(accessorField)} = ${TermName(objNm)}.${TermName(accessorField)}
-      $accessorField -> ${recurQuote(c)(accessorTpe)(accessorField)("")(false)}
+      val $accessorField = ${TermName(objNm)}.$accessorField
+      ${accessorField.toString} -> au.com.fairfax.adonis.apws.macros.JsonRegistry.format(${TermName(accessorField.toString)}, "", false)
     """
+//    q"""
+//      val $accessorField = ${TermName(objNm)}.$accessorField
+//      ${accessorField.toString} -> ${recurQuote(c)(accessorTpe)(accessorField.toString)("")(false)}
+//    """
   }
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
     q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}"
@@ -255,15 +260,15 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * Quote of method definition that creates an case class object of type ct, it will be seomthing like
    * def $methodNm(item: ITEMTYPE) = ???
    */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree = {
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     itemQuoteTemplate(c)(ct)(method) {
       varName =>
         val ctsTypeName = simpleTypeNm(ct.toString)
         val accessorQuotes =
           List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)} """)
-        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
+            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)(???)} """)
+        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)(???)
     }
   }
 
@@ -308,7 +313,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * def handle_TRAITTYPE_traitFamily(objNm: TRAITTYPE) = ???
    * handle_TRAITTYPE_traitFamily(objNm)
    */
-  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree = {
+  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
     val handleTraitMethNm = TermName(methdNameOfHandleItem(traitTpe.toString + "_traitFamily"))
     q"""
@@ -317,7 +322,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree = {
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
   }
@@ -326,7 +331,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    * Quote to format an enum object, it should be something like
    * builder.makeString(objNm.toString)
    */
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree = {
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"${jsonIo(c)}.makeString($objNm.toString)"
   }
@@ -334,25 +339,29 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
+    val quoteToAccessField = q"typedObj"
     val result =
       q"""
       implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
-        override def format[J](obj: Any)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+        override def format[J](obj: Any)(nameOfFormattedField: String)(topObj: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
-          ${jsonIo(c)}.makeObject(
-            "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
-            "args" -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
-          )
+          if (topObj)
+            ${jsonIo(c)}.makeObject(
+              "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
+              nameOfFormattedField -> ${recurQuote(c)(tpe)("typedObj")("")(true)(quoteToAccessField)}
+            )
+          else
+            ${recurQuote(c)(tpe)("typedObj")("")(true)(quoteToAccessField)}
         }
       }
 
       GenJsonFormatter
       """
-//    println(
-//      s"""
-//         |FormatterMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
+    println(
+      s"""
+         |FormatterMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
     c.Expr[JsonFormatter[T]](result)
   }
 }

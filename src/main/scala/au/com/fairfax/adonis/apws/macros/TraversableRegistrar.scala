@@ -140,6 +140,6 @@ object TraversableRegistrar {
 
   private def registerToRegistryQuote(c: Context)(registerTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    q"JsonRegistry.registerNew[$registerTpe]"
+    q"JsonRegistry.register[$registerTpe]"
   }
 }

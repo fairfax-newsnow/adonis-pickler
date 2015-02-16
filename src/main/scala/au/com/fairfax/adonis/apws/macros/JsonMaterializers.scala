@@ -41,37 +41,37 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote to handle a map
    */
-  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
+  def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree
 
   /**
    * Quote to handle a collection
    */
-  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree
+  def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree
 
   /**
    * Quote to handle an option
    */
-  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(itemTpe: c.universe.Type): c.universe.Tree
+  def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree
 
   /**
    * Quote to handle an either
    */
-  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String)(tpe: c.universe.Type): c.universe.Tree
+  def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree
 
   /**
    * Quote to handle a numeric value
    */
-  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
+  def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle a boolean value
    */
-  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
+  def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle a string value
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree
 
   /**
    * The quote for checking if varOfNullCheck is null.
@@ -103,14 +103,14 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote to handle fieldNm on objNm
    */
-  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
+  def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle an accessor, aka a field of a structured type
    */
-  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorField: String): c.universe.Tree
+  def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree
 
   /**
    * Quote of method definition that handle a "case object" of tpe
@@ -120,7 +120,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote of method definition that parse an case class object of type ct
    */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: String): c.universe.Tree
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote of call to method which is the method that handle the case class of a trait
@@ -135,16 +135,16 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
 
-  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String)(quote: c.universe.Tree): c.universe.Tree
+  def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
-  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String): c.universe.Tree
+  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * Quote to handle an enum object
    */
-  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: String): c.universe.Tree
+  def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
-  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: String)(firstRun: Boolean): c.universe.Tree = {
+  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(firstRun: Boolean)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
     import c.universe._
 
     tpe match {
@@ -161,7 +161,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // string type
       case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
-        stringQuote(c)(objNm)(fieldNm)
+        stringQuote(c)(objNm)(fieldNm)(quoteToAccessField)
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
@@ -236,7 +236,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
                 eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
             }
-            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
+            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)(quoteToAccessField)
           case other =>
             throw new Error("Can't match: " + tpe)
         }
