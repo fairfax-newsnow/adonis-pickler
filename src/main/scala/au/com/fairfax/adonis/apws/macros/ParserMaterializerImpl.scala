@@ -85,7 +85,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val intsToItemsQuote =
       q"""
           (0 until arraySize).map {
-            idx => $parseItemMeth(${jsonIo(c)}.readArrayElem(array, idx))
+            idx => 
+              val jsonItem = ${jsonIo(c)}.readArrayElem(array, idx)
+              JsonRegistry.parse(jsonItem, "", Some(${itemTpe.toString})).asInstanceOf[$itemTpe]
           }
       """
 
@@ -101,7 +103,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       def $parseCollMethNm(array: J) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "array") {
           q"""
-            ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
             val arraySize = ${jsonIo(c)}.readArrayLength(array)
             $toCollQuote
           """
@@ -258,10 +259,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    if (fieldNm.toString == "")
-      q"$objNm"
-    else
-      q"${jsonIo(c)}.readObjectField($objNm, $fieldNm)"
+    q"""
+      if ($fieldNm == "")
+        $objNm
+      else
+        ${jsonIo(c)}.readObjectField($objNm, $fieldNm)
+    """
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {

@@ -90,14 +90,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val formatCollMethNm = TermName("formatCollection")
     q"""
       def $formatCollMethNm(objList: $collType[$itemTpe]) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "objList") {
           q"""
-            ${quoteOfHandleItemDef(c)(itemTpe)(formatItemMeth)}
-            val jsonList = objList.map { obj => $formatItemMeth(obj) }
+            val jsonList = objList.map {
+              obj => JsonRegistry.format(obj, "", false)
+            }
             ${jsonIo(c)}.makeArray(jsonList: _*)
           """
         }
