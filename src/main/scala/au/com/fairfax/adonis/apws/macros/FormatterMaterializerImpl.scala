@@ -69,11 +69,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       def $formatMapMethNm(map: $keyTpe Map $valTpe) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "map") {
           q"""
-              ..$itemQuotes
               val elems =
                 map.map { t =>
                   val (k, v) = t
-                  ${jsonIo(c)}.makeArray($keyMeth(k), $valMeth(v))
+                  ${jsonIo(c)}.makeArray(
+                    JsonRegistry.format(k, "", false), JsonRegistry.format(v, "", false)
+                  )
                 }.toList
               ${jsonIo(c)}.makeArray(elems: _*)
           """
@@ -342,13 +343,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
         
         override def format[J](obj: Any)(nameOfFormattedField: String)(topObj: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
+          val formattedField = ${recurQuote(c)(tpe)("typedObj")("")(true)}
           if (topObj)
             ${jsonIo(c)}.makeObject(
               "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
-              nameOfFormattedField -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
+              nameOfFormattedField -> formattedField
             )
           else
-            ${recurQuote(c)(tpe)("typedObj")("")(true)}
+            formattedField
         }
       }
 
