@@ -227,12 +227,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     q"""
       val $accessorField = ${TermName(objNm)}.$accessorField
-      ${accessorField.toString} -> au.com.fairfax.adonis.apws.macros.JsonRegistry.format(${TermName(accessorField.toString)}, "", false)
+      ${accessorField.toString} -> JsonRegistry.format(${TermName(accessorField.toString)}, "", false)
     """
-//    q"""
-//      val $accessorField = ${TermName(objNm)}.$accessorField
-//      ${accessorField.toString} -> ${recurQuote(c)(accessorTpe)(accessorField.toString)("")(false)}
-//    """
   }
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
@@ -342,6 +338,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val result =
       q"""
       implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
+        import au.com.fairfax.adonis.apws.macros.JsonRegistry
+        
         override def format[J](obj: Any)(nameOfFormattedField: String)(topObj: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
           if (topObj)

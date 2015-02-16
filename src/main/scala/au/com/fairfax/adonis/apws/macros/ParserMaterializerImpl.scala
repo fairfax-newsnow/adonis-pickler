@@ -266,7 +266,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"JsonRegistry.parse(${TermName(concatVarNms(objNm, fieldNm.toString))}, ${accessorField.toString}, Some(${accessorTpe.toString})).asInstanceOf[$accessorTpe]"
+    q"""
+      JsonRegistry.parse(
+        ${TermName(concatVarNms(objNm, fieldNm.toString))}, ${accessorField.toString}, Some(${accessorTpe.toString})
+      ).asInstanceOf[$accessorTpe]
+    """
   }
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
