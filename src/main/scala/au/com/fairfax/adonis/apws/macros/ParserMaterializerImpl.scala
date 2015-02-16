@@ -292,8 +292,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * Quote of method definition that creates an case class object of type ct, it will be seomthing like
    * def $methodNm(item: J) = ???
    */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree =
-    quoteOfHandleItemDef(c)(ct)(method)
+  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
+    import c.universe._
+    q"""
+      def $method(item: ${TypeName("J")}) = JsonRegistry.parse(item, "", Some(${ct.toString})).asInstanceOf[$ct]
+    """
+  }
 
   /**
    * Quote of call to method which is the method that parse the case class of a trait
