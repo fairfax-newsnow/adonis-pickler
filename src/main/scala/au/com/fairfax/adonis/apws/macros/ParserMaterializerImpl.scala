@@ -54,18 +54,20 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(kvTpes: (c.universe.Type, c.universe.Type))(kvMeths: (c.universe.TermName, c.universe.TermName))(itemQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val(keyMeth, valMeth) = kvMeths
+    val (keyTpe, valTpe) = kvTpes
     val parseMapMethNm = TermName("parseMap")
     q"""
       def $parseMapMethNm(map: J) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "map") {
           q"""
-            ..$itemQuotes
             val mapSize = ${jsonIo(c)}.readArrayLength(map)
             (0 until mapSize).toList.map { idx =>
               val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
               val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
               val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
-              $keyMeth(key) -> $valMeth(value)
+              
+              JsonRegistry.parse(key, "", Some(${keyTpe.toString})).asInstanceOf[$keyTpe] -> JsonRegistry.parse(value, "", Some(${valTpe.toString})).asInstanceOf[$valTpe]
+
             }.toMap
           """
         }
