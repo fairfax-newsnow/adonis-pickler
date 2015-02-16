@@ -113,20 +113,18 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val formatItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
     val caseQuotes = List(
-      cq"Some(v) => $formatItemMeth(v)",
+      cq"""Some(v) => JsonRegistry.format(v, "", false)""",
       cq"None => ${jsonIo(c)}.makeNull()")
 
-    val formatOptionMethNm = TermName("formatOption")
     q"""
-      def $formatOptionMethNm(opt: Option[$itemTpe]) = {
-        ${quoteOfHandleItemDef(c)(itemTpe)(formatItemMeth)}
+      def formatOption(opt: Option[$itemTpe]) = {
         opt match {
           case ..$caseQuotes
         }
       }
-      $formatOptionMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      
+      formatOption(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 

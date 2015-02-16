@@ -137,24 +137,20 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val parseItemMeth = TermName(methdNameOfHandleItem(itemTpe.toString))
-    val parseOptionMethdNm = TermName("parseOption")
     val optField = TermName(concatVarNms(objNm.toString, fieldNm.toString))
     q"""
-      def $parseOptionMethdNm(json: J): Option[$itemTpe] = {
-        ${quoteOfHandleItemDef(c)(itemTpe)(parseItemMeth)}
-        
+      def parseOption(json: J): Option[$itemTpe] = {
         if (${jsonIo(c)}.isNull(json))
           None
         else
-          Some($parseItemMeth(json))
+          Some( JsonRegistry.parse(json, "", Some(${itemTpe.toString})).asInstanceOf[$itemTpe] )
       }
-      
+
       val $optField = ${fieldQuote(c)(objNm)(fieldNm)}
       if (${jsonIo(c)}.isUndefined($optField))
         None
       else
-        $parseOptionMethdNm($optField)
+        parseOption($optField)
     """
   }
 
