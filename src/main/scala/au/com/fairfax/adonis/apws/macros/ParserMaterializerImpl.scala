@@ -164,23 +164,19 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     val rightTpe = tpe.dealias.typeArgs.last
     val simpleLeftTpe = simpleTypeNm(leftTpe.toString)
     val simpleRightTpe = simpleTypeNm(rightTpe.toString)
-    val leftMeth = TermName(methdNameOfHandleItem(leftTpe.toString))
-    val rightMeth = TermName(methdNameOfHandleItem(rightTpe.toString))
-    val parseEitherMethNm = TermName("parseEither")
 
     q"""
-      def $parseEitherMethNm(json: J): Either[$leftTpe, $rightTpe] = {
-        ${handleCaseClassDefQuote(c)(leftMeth)(leftTpe)("")}
-        ${handleCaseClassDefQuote(c)(rightMeth)(rightTpe)("")}
+      def parseEither(json: J): Either[$leftTpe, $rightTpe] = {
         val value = ${jsonIo(c)}.readObjectField(json, "v")
         val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
         providedTypeName match {
-          case $simpleLeftTpe => Left($leftMeth(value))
-          case $simpleRightTpe => Right($rightMeth(value))
+          case $simpleLeftTpe => Left(JsonRegistry.parse(value, "", Some(${leftTpe.toString})).asInstanceOf[$leftTpe])
+          case $simpleRightTpe => Right(JsonRegistry.parse(value, "", Some(${rightTpe.toString})).asInstanceOf[$rightTpe])
           case missed => throw new Error("Can't match: " + missed)
         }
       }
-      $parseEitherMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      
+      parseEither(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 

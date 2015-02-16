@@ -135,24 +135,15 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
-    val leftFormatMeth = methdNameOfHandleItem(leftTpe.toString)
-    val rightFormatMeth = methdNameOfHandleItem(rightTpe.toString)
-    val formatMethNm = TermName("formatEither")
-    //caseClassItemQuote(c: Context)(method: String)(ct: c.universe.Type)(fieldNm: String)
-    val caseQuotes = List(
-      cq"""Left(v) => ${TermName(leftFormatMeth)}(v)""",
-      cq"""Right(v) => ${TermName(rightFormatMeth)}(v)"""
-    )
-
     q"""
-      def $formatMethNm(either: Either[$leftTpe, $rightTpe]) = {
-        ${handleCaseClassDefQuote(c)(leftFormatMeth)(leftTpe)(fieldNm)}
-        ${handleCaseClassDefQuote(c)(rightFormatMeth)(rightTpe)(fieldNm)}
+      def formatEither(either: Either[$leftTpe, $rightTpe]) = {
         either match {
-          case ..$caseQuotes
+           case Left(v) => JsonRegistry.format(v, "v", true)
+           case Right(v) => JsonRegistry.format(v, "v", true)
         }
       }
-      $formatMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      
+      formatEither(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
