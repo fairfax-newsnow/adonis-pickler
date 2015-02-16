@@ -42,7 +42,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     import c.universe._
     q"""
       def $methodNm(item: ${TypeName("J")}) =
-        ${recurQuote(c)(itemTpe)("item")("")(false)(???)}
+        ${recurQuote(c)(itemTpe)("item")("")(false)}
     """
   }
 
@@ -216,11 +216,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *  reader.readString(objNm_fieldNm)
    * }
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     val assignedVar = TermName(concatVarNms(objNm.toString, fieldNm.toString))
     q"""
-      val $assignedVar = $quoteToAccessField
+      val $assignedVar = ${fieldQuote(c)(objNm)(fieldNm)}
       ${
         quoteWithNullCheck(c)(assignedVar) {
           q"${jsonIo(c)}.readString($assignedVar)"
@@ -261,7 +261,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     if (fieldNm.toString == "")
       q"$objNm"
     else
-      q"${jsonIo(c)}.readObjectField($objNm, ${fieldNm.toString})"
+      q"${jsonIo(c)}.readObjectField($objNm, $fieldNm)"
   }
 
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
@@ -269,11 +269,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     q"JsonRegistry.parse(${TermName(concatVarNms(objNm, fieldNm.toString))}, ${accessorField.toString}, Some(${accessorTpe.toString})).asInstanceOf[$accessorTpe]"
   }
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val assignedVar = concatVarNms(objNm, fieldNm.toString)
     q"""
-      val ${TermName(assignedVar)} = $quoteToAccessField
+      val ${TermName(assignedVar)} = ${fieldQuote(c)(objNm)(fieldNm)}
       ${
         quoteWithNullCheck(c)(varOfNullCheck = assignedVar) {
           q"new $tpe(..$accessorQuotes)"
@@ -387,7 +387,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     }
 
     q"""
-      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)(???)}
+      val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)}
       au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
@@ -395,7 +395,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val quoteToAccessField = q"${jsonIo(c)}.readObjectField(json, nameOfParsedField)"
     val result =
       q"""
         implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
@@ -404,8 +403,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
             def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)
-            println("inside GenJsonParser.parse(), json = " + json + ", nameOfParsedField = " + nameOfParsedField)
-            ${recurQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))(true)(quoteToAccessField)}
+            ${recurQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))(true)}
           }
         }
   

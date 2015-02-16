@@ -41,7 +41,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     itemQuoteTemplate(c)(itemTpe)(methodNm) {
-      recurQuote(c)(itemTpe)(_)("")(false)(???)
+      recurQuote(c)(itemTpe)(_)("")(false)
     }
   }
 
@@ -182,7 +182,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *  builder.makeString(objNm)
    * }
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
       ${
@@ -235,7 +235,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 //    """
   }
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
     val nonNullQuote = q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
     q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}"
@@ -267,8 +267,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
         val ctsTypeName = simpleTypeNm(ct.toString)
         val accessorQuotes =
           List( q""" "t" -> ${toJsonStringQuote(c)(ctsTypeName)} """,
-            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)(???)} """)
-        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)(???)
+            q""" "v" -> ${recurQuote(c)(ct)(varName)(fieldNm)(false)} """)
+        structuredTypeQuote(c)(ct)(varName)(fieldNm)(accessorQuotes)
     }
   }
 
@@ -339,7 +339,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    val quoteToAccessField = q"typedObj"
     val result =
       q"""
       implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
@@ -348,10 +347,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           if (topObj)
             ${jsonIo(c)}.makeObject(
               "t" -> ${jsonIo(c)}.makeString(${tpe.toString}),
-              nameOfFormattedField -> ${recurQuote(c)(tpe)("typedObj")("")(true)(quoteToAccessField)}
+              nameOfFormattedField -> ${recurQuote(c)(tpe)("typedObj")("")(true)}
             )
           else
-            ${recurQuote(c)(tpe)("typedObj")("")(true)(quoteToAccessField)}
+            ${recurQuote(c)(tpe)("typedObj")("")(true)}
         }
       }
 

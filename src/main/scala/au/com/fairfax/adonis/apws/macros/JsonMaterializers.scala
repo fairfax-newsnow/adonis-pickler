@@ -71,7 +71,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   /**
    * Quote to handle a string value
    */
-  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quoteToAccessField: c.universe.Tree): c.universe.Tree
+  def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
   /**
    * The quote for checking if varOfNullCheck is null.
@@ -110,7 +110,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree
 
-  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree])(quoteToAccessField: c.universe.Tree): c.universe.Tree
+  def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
   /**
    * Quote of method definition that handle a "case object" of tpe
@@ -144,7 +144,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
-  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(firstRun: Boolean)(quoteToAccessField: c.universe.Tree): c.universe.Tree = {
+  def recurQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(firstRun: Boolean): c.universe.Tree = {
     import c.universe._
 
     tpe match {
@@ -161,7 +161,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
       // string type
       case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
-        stringQuote(c)(objNm)(fieldNm)(quoteToAccessField)
+        stringQuote(c)(objNm)(fieldNm)
 
       // boolean type
       case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
@@ -236,7 +236,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
                 val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
                 eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
             }
-            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)(quoteToAccessField)
+            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
           case other =>
             throw new Error("Can't match: " + tpe)
         }
