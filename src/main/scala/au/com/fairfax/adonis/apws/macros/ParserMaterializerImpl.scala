@@ -54,9 +54,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
-    val parseMapMethNm = TermName("parseMap")
     q"""
-      def $parseMapMethNm(map: J) = ${
+      def parseMap(map: J) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "map") {
           q"""
             val mapSize = ${jsonIo(c)}.readArrayLength(map)
@@ -69,7 +68,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           """
         }
       }
-      $parseMapMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      parseMap(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
@@ -96,9 +95,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       else
         q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
 
-    val parseCollMethNm = TermName("parseCollection")
     q"""
-      def $parseCollMethNm(array: J) = ${
+      def parseCollection(array: J) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "array") {
           q"""
             val arraySize = ${jsonIo(c)}.readArrayLength(array)
@@ -106,7 +104,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           """
         }
       }
-      $parseCollMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      
+      parseCollection(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 

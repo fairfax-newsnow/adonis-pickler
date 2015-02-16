@@ -63,9 +63,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
 
-    val formatMapMethNm = TermName("formatMap")
     q"""
-      def $formatMapMethNm(map: $keyTpe Map $valTpe) = ${
+      def formatMap(map: $keyTpe Map $valTpe) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "map") {
           q"""
               val elems =
@@ -79,7 +78,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           """
         }
       }
-      $formatMapMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      formatMap(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
@@ -90,9 +89,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
-    val formatCollMethNm = TermName("formatCollection")
     q"""
-      def $formatCollMethNm(objList: $collType[$itemTpe]) = ${
+      def formatCollection(objList: $collType[$itemTpe]) = ${
         quoteWithNullCheck(c)(varOfNullCheck = "objList") {
           q"""
             val jsonList = objList.map {
@@ -102,7 +100,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
           """
         }
       }
-      $formatCollMethNm(${fieldQuote(c)(objNm)(fieldNm)})
+      formatCollection(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
