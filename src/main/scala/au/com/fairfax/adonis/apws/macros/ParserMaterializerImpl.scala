@@ -155,7 +155,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       def parseEither(json: J): Either[$leftTpe, $rightTpe] = {
         val value = ${jsonIo(c)}.readObjectField(json, "v")
         val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
-        providedTypeName match {
+        au.com.fairfax.adonis.utils.simpleTypeNm(providedTypeName) match {
           case $simpleLeftTpe => Left(JsonRegistry.parse(value, "", Some(${leftTpe.toString})).asInstanceOf[$leftTpe])
           case $simpleRightTpe => Right(JsonRegistry.parse(value, "", Some(${rightTpe.toString})).asInstanceOf[$rightTpe])
           case missed => throw new Error("Can't match: " + missed)
