@@ -389,18 +389,17 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           import au.com.fairfax.adonis.apws.macros.JReader
           
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
-            /*def parseJsSerialised(jsSerialised: J) = JsonRegistry.parse[J](jsSerialised)*/
-            ${recurQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))(true)}
+            ${matchAndHandleObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}
           }
         }
   
         GenJsonParser
       """
-    println(
-      s"""
-         |ParserMaterializerImpl.materialize()
-         |$result
-       """.stripMargin)
+//    println(
+//      s"""
+//         |ParserMaterializerImpl.materialize()
+//         |$result
+//       """.stripMargin)
     c.Expr[JsonParser[T]](result)
   }
 }
