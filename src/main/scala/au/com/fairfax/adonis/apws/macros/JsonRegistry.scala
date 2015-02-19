@@ -26,6 +26,8 @@ trait JsonRegistry extends TypeProvider {
   def parse[J](json: J, nameOfParsedField: String, objTpe: Option[String])(implicit reader: JReader[J]): Any
 }
 
+
+
 class BaseJsonRegistry extends JsonRegistry {
 
   private val parsers = new MHashMap[String, JsonParser[_]]
@@ -47,15 +49,13 @@ class BaseJsonRegistry extends JsonRegistry {
     formatters += (formatter._1 -> formatter._2)
     println(
       s"""
-         |add(),
-         |parsers = $parsers
-         |formatters = $formatters
+         |JsonRegistry.add(), parsers =, formatters =
        """.stripMargin)
   }
   
   override def format[J, T: ClassTag](obj: T, nameOfFormattedField: String = "args", topObj: Boolean = true)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
-    println(s"JsonRegistry.format(), key = $key")
+//    println(s"JsonRegistry.format(), key = $key")
     formatters.get {
       key match {
         case "T" => toMapKey(className[T])
@@ -68,7 +68,7 @@ class BaseJsonRegistry extends JsonRegistry {
   }
 
   override def parse[J](json: J, nameOfParsedField: String = "args", objTpe: Option[String] = None)(implicit reader: JReader[J]): Any = {
-    println(s"JsonRegistry.parse(), json = $json, nameOfParsedField = $nameOfParsedField")
+//    println(s"JsonRegistry.parse(), json = $json, nameOfParsedField = $nameOfParsedField")
     val cmdType = objTpe.getOrElse(reader.readString(reader.readObjectField(json, "t")))
     val key = toMapKey(cmdType)
     parsers.get(key).fold {
@@ -82,7 +82,7 @@ object TypeKeyProvider {
   def materializeTypeKeyProvider[T: c.WeakTypeTag](c: Context) = {
     import c.universe._
     val typeTag = c.universe.weakTypeOf[T]
-    println(s"TypeKeyProvider typeTag = $typeTag, typeTag.toString = ${typeTag.toString}")
+//    println(s"TypeKeyProvider typeTag = $typeTag, typeTag.toString = ${typeTag.toString}")
     q"""
     val provider = new au.com.fairfax.adonis.apws.macros.TypeKeyProvider[$typeTag] {
       def key: String = ${typeTag.toString()}

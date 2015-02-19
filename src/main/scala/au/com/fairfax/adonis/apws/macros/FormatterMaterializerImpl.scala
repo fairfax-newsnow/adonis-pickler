@@ -301,6 +301,34 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"${jsonIo(c)}.makeString($objNm.toString)"
   }
 
+  def materialiseDirect(c: Context)(tpe: c.Type): c.Expr[JsonFormatter[_]] = {
+    import c.universe._
+    val result =
+      q"""
+      implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
+        import au.com.fairfax.adonis.apws.macros.JsonRegistry
+
+        override def format[J](obj: Any)(nameOfFormattedField: String)(topObj: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+          val typedObj = obj.asInstanceOf[$tpe]
+          val formattedField = ${matchAndHandleObjTpeQuote(c)(tpe)("typedObj")("")}
+          if (topObj)
+            ${jsonIo(c)}.makeObject( "t" -> ${jsonIo(c)}.makeString(${tpe.toString}), nameOfFormattedField -> formattedField )
+          else
+            formattedField
+        }
+      }
+
+      GenJsonFormatter
+      """
+    println(
+      s"""
+         |FormatterMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
+    println(s"\n\n------------------------  stopping materializeDirect Formatter: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
+    c.Expr[JsonFormatter[_]](result)
+  }
+
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
@@ -321,11 +349,12 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
       GenJsonFormatter
       """
-//    println(
-//      s"""
-//         |FormatterMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
+    println(
+      s"""
+         |FormatterMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
+    println(s"\n\n------------------------  stopping materialize Formatter: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[JsonFormatter[T]](result)
   }
 }

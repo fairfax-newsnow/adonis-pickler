@@ -378,6 +378,31 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
+  
+  def materialiseDirect(c: Context)(tpe: c.Type): c.Expr[JsonParser[_]] = {
+    import c.universe._
+    val result =
+      q"""
+        implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
+          import au.com.fairfax.adonis.apws.macros.JsonRegistry
+          import au.com.fairfax.adonis.apws.macros.JReader
+
+          override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
+            ${matchAndHandleObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}
+          }
+        }
+
+        GenJsonParser
+      """
+    println(
+      s"""
+         |ParserMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
+    println(s"\n\n------------------------  stopping materializeDirect Parser: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
+    c.Expr[JsonParser[_]](result)
+    
+  }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
@@ -395,11 +420,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   
         GenJsonParser
       """
-//    println(
-//      s"""
-//         |ParserMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
+    println(
+      s"""
+         |ParserMaterializerImpl.materialize()
+         |$result
+       """.stripMargin)
+    println(s"\n\n------------------------  stopping materialize Parser: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[JsonParser[T]](result)
   }
 }
