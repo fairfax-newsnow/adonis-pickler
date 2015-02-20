@@ -53,7 +53,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
                 map.map { t =>
                   val (k, v) = t
                   ${jsonIo(c)}.makeArray(
-                    JsonRegistry.format(k, "", false), JsonRegistry.format(v, "", false)
+                    JsonRegistry.internalFormat(k, "", false, ${keyTpe.toString}), JsonRegistry.internalFormat(v, "", false, ${valTpe.toString})
                   )
                 }.toList
               ${jsonIo(c)}.makeArray(elems: _*)
@@ -76,7 +76,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
         quoteWithNullCheck(c)(varOfNullCheck = "objList") {
           q"""
             val jsonList = objList.map {
-              obj => JsonRegistry.format(obj, "", false)
+              obj => JsonRegistry.internalFormat(obj, "", false, ${itemTpe.toString})
             }
             ${jsonIo(c)}.makeArray(jsonList: _*)
           """
@@ -94,7 +94,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val caseQuotes = List(
-      cq"""Some(v) => JsonRegistry.format(v, "", false)""",
+      cq"""Some(v) => JsonRegistry.internalFormat(v, "", false, ${itemTpe.toString})""",
       cq"None => ${jsonIo(c)}.makeNull()")
 
     q"""
@@ -120,8 +120,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"""
       def formatEither(either: Either[$leftTpe, $rightTpe]) = {
         either match {
-           case Left(v) => JsonRegistry.format(v, "v", true)
-           case Right(v) => JsonRegistry.format(v, "v", true)
+           case Left(v) => JsonRegistry.internalFormat(v, "v", true, ${leftTpe.toString})
+           case Right(v) => JsonRegistry.internalFormat(v, "v", true, ${rightTpe.toString})
         }
       }
       
@@ -196,7 +196,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
     q"""
       val $accessorField = ${TermName(objNm)}.$accessorField
-      ${accessorField.toString} -> JsonRegistry.format(${TermName(accessorField.toString)}, "", false)
+      ${accessorField.toString} -> JsonRegistry.internalFormat(${TermName(accessorField.toString)}, "", false, ${accessorTpe.toString})
     """
   }
 
@@ -231,7 +231,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val methImplQuote = structuredTypeQuote(c)(ct)(objNm.toString)(fieldNm) {
       List(
         q""" "t" -> ${toJsonStringQuote(c)(simpleTypeNm(ct.toString))} """,
-        q""" "v" -> JsonRegistry.format($objNm, ${fieldNm.toString}, false) """)
+        q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${ct.toString}) """)
     }
     
     q"def $method($objNm: $ct) = $methImplQuote"
@@ -289,7 +289,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
 //  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
 //    import c.universe._
-//    q"au.com.fairfax.adonis.apws.macros.JsonRegistry.format[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
+//    q"au.com.fairfax.adonis.apws.macros.JsonRegistry.internalFormat[J, $tpe](${fieldQuote(c)(objNm)(fieldNm)})"
 //  }
 
   /**

@@ -21,7 +21,7 @@ trait TypeProvider {
 
 trait JsonRegistry extends TypeProvider {
 
-  def format[J, T: ClassTag](obj: T, nameOfFormattedField: String, topObj: Boolean)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J
+  def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J
 
   def parse[J](json: J, nameOfParsedField: String, objTpe: Option[String])(implicit reader: JReader[J]): Any
 }
@@ -33,29 +33,33 @@ class BaseJsonRegistry extends JsonRegistry {
   private val parsers = new MHashMap[String, JsonParser[_]]
   private val formatters = new MHashMap[String, JsonFormatter[_]]
 
-  def register[T](implicit traversableReg: TraversableRegistrar[T]): Unit = {
-    traversableReg.traversableRegister
-//    val key = keyProvider.key
-//    val replacedKey = toMapKey(key)
-//    parsers += (replacedKey -> parser)
-//    formatters += (replacedKey -> formatter)
+  def register[T](implicit pTraversableReg: ParserTraversableRegistrar[T], fTraversableReg: FormatterTraversableRegistrar[T]): Unit = {
+    pTraversableReg.traversableRegister
+    fTraversableReg.traversableRegister
   }
-  
-//  def registerNew[T](implicit traversableReg: TraversableRegistrar[T]): Unit =
-//    traversableReg.traversableRegister
 
-  def add(parser: (String, JsonParser[_]))(formatter: (String, JsonFormatter[_])): Unit = {
+
+  def addParser(parser: (String, JsonParser[_])): Unit = {
     parsers += (parser._1 -> parser._2)
-    formatters += (formatter._1 -> formatter._2)
+//    formatters += (formatter._1 -> formatter._2)
     println(
       s"""
-         |JsonRegistry.add(), parsers =, formatters =
+         |JsonRegistry.addParser() for key ${parser._1}
        """.stripMargin)
   }
-  
-  override def format[J, T: ClassTag](obj: T, nameOfFormattedField: String = "args", topObj: Boolean = true)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
+
+  def addFormatter(formatter: (String, JsonFormatter[_])): Unit = {
+    formatters += (formatter._1 -> formatter._2)
+    //    formatters += (formatter._1 -> formatter._2)
+    println(
+      s"""
+         |JsonRegistry.addFormatter() for key ${formatter._1}
+       """.stripMargin)
+  }
+
+  override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key
-//    println(s"JsonRegistry.format(), key = $key")
+//    println(s"public JsonRegistry.format(), obj = $obj, key = $key")
     formatters.get {
       key match {
         case "T" => toMapKey(className[T])
@@ -64,7 +68,14 @@ class BaseJsonRegistry extends JsonRegistry {
       }
     }.fold {
       throw new Error(s"No formatter exists for $key")
-    } { _.format(obj)(nameOfFormattedField)(topObj) }
+    } { _.format(obj)("args")(true) }
+  }
+  
+  def internalFormat[J](obj: Any, nameOfFormattedField: String, topObj: Boolean, key: String)(implicit builder: JBuilder[J]): J = {
+//    println(s"macro accessed formatters contains $key == ${formatters contains key}")
+    formatters.get(key).fold {
+      throw new Error(s"No formatter exists for $key")
+    }(_.format(obj)(nameOfFormattedField)(topObj))
   }
 
   override def parse[J](json: J, nameOfParsedField: String = "args", objTpe: Option[String] = None)(implicit reader: JReader[J]): Any = {
