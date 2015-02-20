@@ -33,29 +33,37 @@ class BaseJsonRegistry extends JsonRegistry {
   private val parsers = new MHashMap[String, JsonParser[_]]
   private val formatters = new MHashMap[String, JsonFormatter[_]]
 
-  def register[T](implicit pTraversableReg: ParserTraversableRegistrar[T], fTraversableReg: FormatterTraversableRegistrar[T]): Unit = {
-    pTraversableReg.traversableRegister
-    fTraversableReg.traversableRegister
+  def register[T](implicit pTraversableReg: ParserTraversableRegistrar[T]/*, fTraversableReg: FormatterTraversableRegistrar[T]*/): Unit = {
+    println(s"JsonRegistry.register(), registering[T]")
+    val tuples = pTraversableReg.traversableRegister
+    tuples foreach {
+      t =>
+        val (key, parser, formatter) = t
+        parsers += (key -> parser)
+        formatters += (key -> formatter)
+    }
+    println(s"JsonRegistry.registered(), added ${tuples.size} parser(s), parsers = $parsers")
+    //    fTraversableReg.traversableRegister
   }
 
 
-  def addParser(parser: (String, JsonParser[_])): Unit = {
-    parsers += (parser._1 -> parser._2)
+//  def addParser(parser: (String, JsonParser[_])): Unit = {
+//    parsers += (parser._1 -> parser._2)
+////    formatters += (formatter._1 -> formatter._2)
+//    println(
+//      s"""
+//         |JsonRegistry.addParser() for key ${parser._1}
+//       """.stripMargin)
+//  }
+//
+//  def addFormatter(formatter: (String, JsonFormatter[_])): Unit = {
 //    formatters += (formatter._1 -> formatter._2)
-    println(
-      s"""
-         |JsonRegistry.addParser() for key ${parser._1}
-       """.stripMargin)
-  }
-
-  def addFormatter(formatter: (String, JsonFormatter[_])): Unit = {
-    formatters += (formatter._1 -> formatter._2)
-    //    formatters += (formatter._1 -> formatter._2)
-    println(
-      s"""
-         |JsonRegistry.addFormatter() for key ${formatter._1}
-       """.stripMargin)
-  }
+//    //    formatters += (formatter._1 -> formatter._2)
+//    println(
+//      s"""
+//         |JsonRegistry.addFormatter() for key ${formatter._1}
+//       """.stripMargin)
+//  }
 
   override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val key = keyProvider.key

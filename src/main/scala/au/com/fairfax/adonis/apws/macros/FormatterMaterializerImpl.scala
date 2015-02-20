@@ -320,11 +320,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
       GenJsonFormatter
       """
-    println(
-      s"""
-         |FormatterMaterializerImpl.materialize()
-         |$result
-       """.stripMargin)
+//    println(
+//      s"""
+//         |FormatterMaterializerImpl.materialize()
+//         |$result
+//       """.stripMargin)
     println(s"\n\n------------------------  stopping materializeDirect Formatter: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[JsonFormatter[_]](result)
   }
@@ -349,11 +349,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
       GenJsonFormatter
       """
-    println(
-      s"""
-         |FormatterMaterializerImpl.materialize()
-         |$result
-       """.stripMargin)
+//    println(
+//      s"""
+//         |FormatterMaterializerImpl.materialize()
+//         |$result
+//       """.stripMargin)
     println(s"\n\n------------------------  stopping materialize Formatter: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[JsonFormatter[T]](result)
   }
