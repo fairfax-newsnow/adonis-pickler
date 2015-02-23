@@ -137,14 +137,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
-//  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree
-
   /**
    * Quote to handle an enum object
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree
 
-  def matchAndHandleObjTpeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
+  final def matchObjTpeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
 
     tpe match {
@@ -152,11 +150,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         enumObjQuote(c)(t)(objNm)(fieldNm)
 
-        // no need this type matched anymore, because each generated parser or formatter are now calling JsonRegistry.parse() or JsonRegistry.format()
-//      case t: Type if t <:< c.mirror.typeOf[JsSerialisable] && !firstRun =>
-//        jsSerialisableQuote(c)(t)(objNm)(fieldNm)
-
-      // a numeric type
       case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
         numericValQuote(c)(t)(objNm)(fieldNm)
 

@@ -346,11 +346,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-//  def jsSerialisableQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
-//    import c.universe._
-//    q"parseJsSerialised(${fieldQuote(c)(objNm)(fieldNm)}).asInstanceOf[$tpe]"
-//  }
-
   /**
    * Quote to parse an enum object, it should be something like, e.g.
    * val caseEnumName = {
@@ -379,53 +374,24 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
   
-  def materialiseDirect(c: Context)(tpe: c.Type): c.Expr[JsonParser[_]] = {
+  def parserQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    val result =
       q"""
         implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
           import au.com.fairfax.adonis.apws.macros.JsonRegistry
           import au.com.fairfax.adonis.apws.macros.JReader
 
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
-            ${matchAndHandleObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}
+            ${matchObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}
           }
         }
 
         GenJsonParser
       """
-//    println(
-//      s"""
-//         |ParserMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
-    println(s"\n\n------------------------  stopping materializeDirect Parser: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
-    c.Expr[JsonParser[_]](result)
-    
   }
 
   def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
     import c.universe._
-    val tpe = weakTypeOf[T]
-    val result =
-      q"""
-        implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
-          import au.com.fairfax.adonis.apws.macros.JsonRegistry
-          import au.com.fairfax.adonis.apws.macros.JReader
-          
-          override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
-            ${matchAndHandleObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}
-          }
-        }
-  
-        GenJsonParser
-      """
-//    println(
-//      s"""
-//         |ParserMaterializerImpl.materialize()
-//         |$result
-//       """.stripMargin)
-    println(s"\n\n------------------------  stopping materialize Parser: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
-    c.Expr[JsonParser[T]](result)
+    c.Expr[JsonParser[T]](parserQuote(c)(weakTypeOf[T]))
   }
 }
