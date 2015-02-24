@@ -47,7 +47,7 @@ object TraversableRegistrar {
 //         |$result
 //       """.stripMargin)
 
-    println(s"\n\n------------------------  stopping TraversableRegistrar: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
+//    println(s"\n\n------------------------  stopping TraversableRegistrar: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[TraversableRegistrar[T]](result)
   }
 

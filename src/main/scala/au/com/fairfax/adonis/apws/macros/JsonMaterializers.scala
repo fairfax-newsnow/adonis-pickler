@@ -4,7 +4,6 @@ package au.com.fairfax.adonis.apws.macros
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
-import au.com.fairfax.adonis.apws.base.JsSerialisable
 import au.com.fairfax.adonis.utils.simpleTypeNm
 import au.com.fairfax.adonis.apws.types.Enum
 
