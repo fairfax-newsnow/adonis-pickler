@@ -267,10 +267,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   /**
    * Quote of method definition that creates a "case object" of tpe, it will be something like
    */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree = {
     this.synchronized {
       import c.universe._
-      q"def $methodNm = new $tpe"
+      q"def $methodNm = ${tpe.typeSymbol.asClass.module}"
     }
   }
 

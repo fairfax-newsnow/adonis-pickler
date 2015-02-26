@@ -9,10 +9,10 @@ import scala.reflect.macros.blackbox.Context
 object ParserFormatterTracker {
   var registeredTypes: Set[String] = Set.empty
 
-  def add(t: String): Unit = 
+  def add(t: String): Unit =
     registeredTypes += t
 
-  def contains(t: String): Boolean = 
+  def contains(t: String): Boolean =
     registeredTypes contains t
 }
 
@@ -26,8 +26,8 @@ trait TraversableRegistrar[T] {
 
 object TraversableRegistrar {
   implicit def registerHelperMacros[T]: TraversableRegistrar[T] = macro materialize[T]
-  
-  
+
+
   def materialize[T: c.universe.WeakTypeTag](c: Context): c.Expr[TraversableRegistrar[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
@@ -43,11 +43,10 @@ object TraversableRegistrar {
 
 //    println(
 //      s"""
-//         |TraversableRegistrar.materialize[$tpe], result =
-//         |$result
-//       """.stripMargin)
-
-//    println(s"\n\n------------------------  stopping TraversableRegistrar: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
+//             |TraversableRegistrar.materialize[$tpe], result =
+//             |$result
+//           """.stripMargin)
+        println(s"\n\n------------------------  stopping TraversableRegistrar: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[TraversableRegistrar[T]](result)
   }
 
@@ -84,7 +83,7 @@ object TraversableRegistrar {
     import c.universe._
 
     lazy val accessors: List[MethodSymbol] = getAccessors(c)(tpe)
-    
+
     tpe match {
       // a collection type
       case collectionTpe: Type if collTypes(c) contains tpeClassNm(c)(collectionTpe) =>
@@ -109,7 +108,7 @@ object TraversableRegistrar {
 
       // a sealed trait
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        getSealedTraitChildren(c)(traitTpe).withFilter(!hasNoAccessor(c)(_)).map {
+        getSealedTraitChildren(c)(traitTpe).withFilter(ct => !(ct.typeSymbol.isModuleClass)).map {
           childParserFormatter(c)(_)
         }.foldLeft[Tree](q"Nil") {
           (z, accessorQuote) => q"$z ::: $accessorQuote"
@@ -132,12 +131,12 @@ object TraversableRegistrar {
   private def childParserFormatter(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
     val tpeName = toMapKey(tpe.toString)
-    if (ParserFormatterTracker contains tpeName) 
+    if (ParserFormatterTracker contains tpeName)
       q"Nil"
     else {
       ParserFormatterTracker add tpeName
       val (parser, formatter) = parserFormatterQuote(c)(tpe)
       q"($tpeName, $parser, $formatter) :: ${traverseChildrenQuote(c)(tpe)}"
-    } 
+    }
   }
 }

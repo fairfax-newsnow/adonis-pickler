@@ -31,11 +31,6 @@ import Materializer._
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
-  private def toJsonStringQuote(c: Context)(s: String): c.universe.Tree = {
-    import c.universe._
-    q"${jsonIo(c)}.makeString($s)"
-  }
-
   /**
    * Quote to parse collection, it will be something like
    * def formatMap(map: K Map V) = ???
@@ -209,14 +204,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   /**
    * Quote of method definition that formats the "case object" of tpe
    */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(methodNm: c.universe.TermName)(areSiblingCaseObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree = {
     import c.universe._
-    val typeName = simpleTypeNm(tpe.toString)
     val methodImplQuote =
-      if (areSiblingCaseObjs)
-        toJsonStringQuote(c)(typeName)
+      if (allChildrenAreObjs)
+        q"${jsonIo(c)}.makeString($tpeFormattedInJson)"
       else
-        q"""${jsonIo(c)}.makeObject("t" -> ${toJsonStringQuote(c)(typeName)}, "v" -> ${toJsonStringQuote(c)("")})"""
+        q"""${jsonIo(c)}.makeObject("t" -> ${jsonIo(c)}.makeString($tpeFormattedInJson), "v" -> ${jsonIo(c)}.makeString(""))"""
 
     q"def $methodNm = $methodImplQuote"
   }
@@ -230,7 +224,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val objNm = TermName("obj")
     val methImplQuote = structuredTypeQuote(c)(ct)(objNm.toString)(fieldNm) {
       List(
-        q""" "t" -> ${toJsonStringQuote(c)(simpleTypeNm(ct.toString))} """,
+        q""" "t" -> ${jsonIo(c)}.makeString(${simpleTypeNm(ct.toString)}) """,
         q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${ct.toString}) """)
     }
     
@@ -293,7 +287,15 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    q"${jsonIo(c)}.makeString($objNm.toString)"
+    q"""
+      val objStr = $objNm.toString
+      ${jsonIo(c)}.makeString {
+        if (objStr endsWith ${"$"})
+          objStr.substring(0, objStr.length - 1)
+        else 
+          objStr
+      }
+    """
   }
 
   def formatterQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
