@@ -4,7 +4,7 @@ import scala.collection.mutable.{HashMap => MHashMap}
 import scala.language.experimental.macros
 import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox.Context
-
+import scala.language.existentials
 
 trait TypeKeyProvider[T] {
   def key: String
