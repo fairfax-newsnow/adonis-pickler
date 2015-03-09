@@ -40,29 +40,29 @@ class BaseJsonRegistry extends JsonRegistry {
         formatters += (key -> formatter)
     }
 
-  override def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
-    val key = keyProvider.key
+  def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
+    val typeKey = keyProvider.key
     formatters.get {
-      key match {
+      typeKey match {
         case "T" => toMapKey(className[T])
         case k if strReplacement.exists(k contains _._1) => toMapKey(k)
-        case _ => key
+        case _ => typeKey
       }
     }.fold {
-      throw new Error(s"No formatter exists for $key")
+      throw new Error(s"No formatter exists for $typeKey")
     } { _.format(obj)("args")(true) }
   }
 
   /**
-   * a function that should be called by a generated formatter only, the reason is the the formatter does not need
-   * to provide a TypeKeyProvider that needs macro again which results in high memory usage  
+   * A function that should be called by a generated formatter only, the reason is the the formatter can provide the typeKey information without 
+   * using a TypeKeyProvider.  Using TypeKeyProvider needs macro which results in high memory usage  
    */
-  def internalFormat[J](obj: Any, nameOfFormattedField: String, topObj: Boolean, key: String)(implicit builder: JBuilder[J]): J = 
-    formatters.get(key).fold {
-      throw new Error(s"No formatter exists for $key")
+  def internalFormat[J](obj: Any, nameOfFormattedField: String, topObj: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J =
+    formatters.get(typeKey).fold {
+      throw new Error(s"No formatter exists for $typeKey")
     }(_.format(obj)(nameOfFormattedField)(topObj))
 
-  override def parse[J](json: J, nameOfParsedField: String = "args", objTpe: Option[String] = None)(implicit reader: JReader[J]): Any = {
+  def parse[J](json: J, nameOfParsedField: String = "args", objTpe: Option[String] = None)(implicit reader: JReader[J]): Any = {
     val cmdType = objTpe getOrElse reader.readString(reader.readObjectField(json, "t"))
     val key = toMapKey(cmdType)
     parsers.get(key).fold {
