@@ -32,8 +32,21 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
   /**
-   * Quote to parse collection, it will be something like
-   * def formatMap(map: K Map V) = ???
+   * Quote to format a map, it will be something like
+   * 
+   * def formatMap(map: K Map V) = 
+   *   if (map == null)
+   *     throw new IllegalArgumentException("The data object has a null attribute")
+   *   else {
+   *     val elems = 
+   *       map.map { t =>
+   *         val (k, v) = t
+   *         builder.makeArray(
+   *           JsonRegistry.internalFormat(k, "", false, k's Type), JsonRegistry.internalFormat(v, "", false, v's Type)          
+   *         )         
+   *       }.toList         
+   *     builder.makeArray(elems: _*)    
+   *   }   
    * formatMap(objNm)
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
@@ -60,18 +73,27 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   }
 
   /**
-   * Quote to parse collection, it will be something like
-   * def formatCollection(objList: Seq[ITEM]) = ???
+   * Quote to format a collection, it will be something like
+   *  
+   * def formatCollection(itemList: Seq[ITEM]) <- not necessarily Seq but any collection type 
+   *   if (itemList == null)
+   *     throw new IllegalArgumentException("The data object has a null attribute")
+   *   else {
+   *     val jsonList = itemList.map (
+   *       item => JsonRegistry.internalFormat(item, "", false, item's type)       
+   *     )     
+   *     builder.makeArray(jsonList: _*)     
+   *   }   
    * formatCollection(objNm)
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
     q"""
-      def formatCollection(objList: $collType[$itemTpe]) = ${
-        quoteWithNullCheck(c)(varOfNullCheck = "objList") {
+      def formatCollection(itemList: $collType[$itemTpe]) = ${
+        quoteWithNullCheck(c)(varOfNullCheck = "itemList") {
           q"""
-            val jsonList = objList.map {
-              obj => JsonRegistry.internalFormat(obj, "", false, ${itemTpe.toString})
+            val jsonList = itemList.map {
+              item => JsonRegistry.internalFormat(item, "", false, ${itemTpe.toString})
             }
             ${jsonIo(c)}.makeArray(jsonList: _*)
           """
@@ -83,7 +105,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format an option, it will be something like
-   * def formatOption(opt: Option[ITEM]) = ???
+   * def formatOption(opt: Option[ITEM]) = 
+   *   opt match {
+   *     case Some(v) => JsonRegistry.internalFormat(v, "", false, item's type)
+   *     case None => builder.makeNull()     
+   *   }   
    * formatOption(objNm)
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
@@ -93,11 +119,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       cq"None => ${jsonIo(c)}.makeNull()")
 
     q"""
-      def formatOption(opt: Option[$itemTpe]) = {
+      def formatOption(opt: Option[$itemTpe]) = 
         opt match {
           case ..$caseQuotes
         }
-      }
       
       formatOption(${fieldQuote(c)(objNm)(fieldNm)})
     """
@@ -105,7 +130,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format an either, it will be something like
-   * def formatEither(either: Either[LEFT, RIGHT]) = ???
+   * def formatEither(either: Either[LEFT, RIGHT]) = 
+   *   either match {
+   *     case Left(v) => JsonRegistry.internalFormat(v, "v", true, left item's type)
+   *     case Right(v) => JsonRegistry.internalFormat(v, "v", true, right item's type)     
+   *   }   
    * formatEither(objNm)
    */
   def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree = {
@@ -113,20 +142,19 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     val leftTpe = tpe.dealias.typeArgs.head
     val rightTpe = tpe.dealias.typeArgs.last
     q"""
-      def formatEither(either: Either[$leftTpe, $rightTpe]) = {
+      def formatEither(either: Either[$leftTpe, $rightTpe]) =
         either match {
            case Left(v) => JsonRegistry.internalFormat(v, "v", true, ${leftTpe.toString})
            case Right(v) => JsonRegistry.internalFormat(v, "v", true, ${rightTpe.toString})
         }
-      }
       
       formatEither(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
 
   /**
-   * Quote for formatting a numeric value, it will be something like, e.g.
-   * builder.makeNumber(objNm)
+   * Quote for formatting a numeric value, it will be something like, 
+   * builder.makeNumber(objNm) or builder.makeNumber(objNm.asInstanceOf[Double]) depends on whether the field is double
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
    */
@@ -139,12 +167,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   }
 
   /**
-   * Quote for formatting a string value, it will be something like, e.g.
-   * if (objNm == null) {
+   * Quote for formatting a string value, it will be something like
+   * if (objNm == null)
    *   throw new IllegalArgumentException
-   * } else {
+   * else
    *  builder.makeString(objNm)
-   * }
    */
   def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -158,7 +185,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   }
 
   /**
-   * Quote for formatting a boolean value, it will be something like, e.g.
+   * Quote for formatting a boolean value, it will be something like
    * builder.makeBoolean(objNm)
    *
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
@@ -187,67 +214,63 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     q"$objNm"
   }
 
+  /**
+   * Quote that formats the field of a case class object, it will be something like
+   * val caseField = obj.caseField
+   * "caseField" -> JsonRegistry.internalFormat(caseField, "", false, caseField's type)
+   */
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
     import c.universe._
     q"""
       val $accessorField = ${TermName(objNm)}.$accessorField
-      ${accessorField.toString} -> JsonRegistry.internalFormat(${TermName(accessorField.toString)}, "", false, ${accessorTpe.toString})
+      ${accessorField.toString} -> JsonRegistry.internalFormat($accessorField, "", false, ${accessorTpe.toString})
     """
   }
 
+  /**
+   * Quote that formats a case class object, it will be something like
+   * if (obj == null)
+   *   throw new IllegalArgumentException("The data object has a null attribute")
+   * else
+   *   builder.makeObject(caseField1Quote, caseField2Quote, ...)
+   */
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
-    val nonNullQuote = q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
-    q"${quoteWithNullCheck(c)(varOfNullCheck = objNm)(nonNullQuote)}"
+    quoteWithNullCheck(c)(varOfNullCheck = objNm) {
+      q"${jsonIo(c)}.makeObject(..$accessorQuotes)"
+    }
   }
 
-  /**
-   * Quote of method definition that formats the "case object" of tpe
-   */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
+    val method: TermName = methdNameOfHandleItem(tpeInJson)
     val methodImplQuote =
       if (allChildrenAreObjs)
-        q"${jsonIo(c)}.makeString($tpeFormattedInJson)"
+        q"${jsonIo(c)}.makeString($tpeInJson)"
       else
-        q"""${jsonIo(c)}.makeObject("t" -> ${jsonIo(c)}.makeString($tpeFormattedInJson), "v" -> ${jsonIo(c)}.makeString(""))"""
-
-    q"def $methodNm = $methodImplQuote"
-  }
-
-  /**
-   * Quote of method definition that creates an case class object of type ct, it will be seomthing like
-   * def $methodNm(item: ITEMTYPE) = ???
-   */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    val objNm = TermName("obj")
-    val methImplQuote = structuredTypeQuote(c)(ct)(objNm.toString)(fieldNm) {
-      List(
-        q""" "t" -> ${jsonIo(c)}.makeString(${simpleTypeNm(ct.toString)}) """,
-        q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${ct.toString}) """)
-    }
+        q"""${jsonIo(c)}.makeObject("t" -> ${jsonIo(c)}.makeString($tpeInJson), "v" -> ${jsonIo(c)}.makeString(""))"""
     
-    q"def $method($objNm: $ct) = $methImplQuote"
+    val handleCaseObjMethQuote = q"def $method = $methodImplQuote"
+    val patternToCallCaseObj = cq"_: $tpe => $method"
+    
+    (handleCaseObjMethQuote, patternToCallCaseObj)
   }
-
-  private lazy val varBeMatched = "obj"
-
-  /**
-   * Quote of call to method which is the method that formats the case class of a trait
-   */
-  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
+  
+  def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
-    q"$handleCaseClassMeth(${TermName(varBeMatched)})"
-  }
+    val objNm: TermName = "obj"
+    val tpeString = tpe.toString
+    val method: TermName = methdNameOfHandleItem(tpeString)
+    val methImplQuote = structuredTypeQuote(c)(tpe)(objNm.toString)(fieldNm) {
+      List(
+        q""" "t" -> ${jsonIo(c)}.makeString(${simpleTypeNm(tpeString)}) """,
+        q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${tpeString}) """)
+    }
 
-  /**
-   * Quote that maps a pattern to the corresponding handler, it will be something like
-   * obj @ (_: Pattern) => handler
-   */
-  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree = {
-    import c.universe._
-    cq"${TermName(varBeMatched)} : $ct => $handlerQuote"
+    val handleCaseClassMethQuote = q"def $method($objNm: $tpe) = $methImplQuote"
+    val patternToCallCaseClass = cq"$objNm : $tpe => $method($objNm)"
+    
+    (handleCaseClassMethQuote, patternToCallCaseClass)
   }
 
   /**
