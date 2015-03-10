@@ -111,27 +111,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  /**
-   * Quote of method definition that handle a "case object" of tpe
-   */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree)
 
-  /**
-   * Quote of method definition that parse an case class object of type ct
-   */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree
-
-  /**
-   * Quote of call to method which is the method that handle the case class of a trait
-   */
-  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree
-
-  /**
-   * Quote that maps a pattern to the corresponding handler, it will be someething like
-   * pattern => handler
-   */
-  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree
-
+  def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree)
+  
   def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
@@ -184,28 +167,20 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
         val allChildrenAreObjs = childTypes forall (_.typeSymbol.isModuleClass)
 
-        // defChildQuote is list of defChildTypeQuote
-        // patternToCallChildQuotes are the list of quotes where each defines something like ChildType => handleChildTypeCall
-        val (defChildQuote, patternToCallChildQuotes) = childTypes.map {
+        val (handleChildQuote, patternToCallChildQuotes) = childTypes.map {
           ct =>
             // if ct is a case object, the type name will end with ".type" and should be trimmed off
             val ctString = simpleTypeNm(ct.toString).replace(".type", "")
-            val defChildMeth = TermName(methdNameOfHandleItem(ctString))
-            // defChildQuote defines the method that handles the case object or case class
-            // callChildQuote is a call to method implemented by defChildQuote
-            val (defChildQuote, callChildQuote) =
-              if (ct.typeSymbol.isModuleClass)  // case "object"
-                (handleCaseObjDefQuote(c)(ct)(ctString)(defChildMeth)(allChildrenAreObjs), q"$defChildMeth")
-              else  // case class
-                (handleCaseClassDefQuote(c)(defChildMeth)(ct)(fieldNm), handleCaseClassCallQuote(c)(defChildMeth)(objNm))
-
-            (defChildQuote, patternToHandlerQuote(c)(ct)(ctString)(callChildQuote))
+            if (ct.typeSymbol.isModuleClass)
+              handleCaseObjectAndCallQuote(c)(ct)(ctString)(allChildrenAreObjs)
+            else
+              handleCaseClassAndCallQuote(c)(ct)(objNm)(fieldNm)
         }.unzip
 
         val traitMethImplQuote =
           quoteWithNullCheck(c)(varOfNullCheck = objNm) {
             q"""
-              ..$defChildQuote
+              ..$handleChildQuote
               ${ptnMatchQuoteForTraitFamily(c)(allChildrenAreObjs)(patternToCallChildQuotes)(objNm)}
             """
           }

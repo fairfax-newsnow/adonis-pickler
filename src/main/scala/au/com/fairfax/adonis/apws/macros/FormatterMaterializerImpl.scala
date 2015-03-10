@@ -241,67 +241,36 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     }
   }
 
-  /**
-   * Quote that formats the "case object",
-   * if the children of this case object's trait are all case objects, it will be
-   * def handleCaseObjectMethod = builder.makeString(the case object's type)
-   * o.w.
-   * def handleCaseObjectMethod = builder.makeObject("t" -> builder.makeString(the case object's type), "v" -> builder.makeString(""))
-   */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree = {
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
+    val method: TermName = methdNameOfHandleItem(tpeInJson)
     val methodImplQuote =
       if (allChildrenAreObjs)
-        q"${jsonIo(c)}.makeString($tpeFormattedInJson)"
+        q"${jsonIo(c)}.makeString($tpeInJson)"
       else
-        q"""${jsonIo(c)}.makeObject("t" -> ${jsonIo(c)}.makeString($tpeFormattedInJson), "v" -> ${jsonIo(c)}.makeString(""))"""
-
-    q"def $methodNm = $methodImplQuote"
+        q"""${jsonIo(c)}.makeObject("t" -> ${jsonIo(c)}.makeString($tpeInJson), "v" -> ${jsonIo(c)}.makeString(""))"""
+    
+    val handleCaseObjMethQuote = q"def $method = $methodImplQuote"
+    val patternToCallCaseObj = cq"_: $tpe => $method"
+    
+    (handleCaseObjMethQuote, patternToCallCaseObj)
   }
-
-  /**
-   * Quote that formats an case class object, it will be something like
-   * def method(obj: CASECLASSTYPE) = 
-   *   if (obj == null)
-   *     throw new IllegalArgumentException("The data object has a null attribute")
-   *   else
-   *     builder.makeObject(
-   *       "t" -> builder.makeString(the case class' simple class name),
-   *       "v" -> JsonRegistry.internalFormat(obj, the object field, false, the case class' class name)
-   *     )     
-   */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
+  
+  def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
     val objNm: TermName = "obj"
-    val methImplQuote = structuredTypeQuote(c)(ct)(objNm.toString)(fieldNm) {
+    val tpeString = tpe.toString
+    val method: TermName = methdNameOfHandleItem(tpeString)
+    val methImplQuote = structuredTypeQuote(c)(tpe)(objNm.toString)(fieldNm) {
       List(
-        q""" "t" -> ${jsonIo(c)}.makeString(${simpleTypeNm(ct.toString)}) """,
-        q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${ct.toString}) """)
+        q""" "t" -> ${jsonIo(c)}.makeString(${simpleTypeNm(tpeString)}) """,
+        q""" "v" -> JsonRegistry.internalFormat($objNm, ${fieldNm.toString}, false, ${tpeString}) """)
     }
+
+    val handleCaseClassMethQuote = q"def $method($objNm: $tpe) = $methImplQuote"
+    val patternToCallCaseClass = cq"$objNm : $tpe => $method($objNm)"
     
-    q"def $method($objNm: $ct) = $methImplQuote"
-  }
-
-  private lazy val varBeMatched = "obj"
-
-  /**
-   * Quote of call to a method that formats a trait's child case class, it will be something like
-   * handleCaseClassMethod(obj)
-   */
-  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"$handleCaseClassMeth(${TermName(varBeMatched)})"
-  }
-
-  /**
-   * Quote that maps a pattern to the corresponding handler, it will be something like
-   * obj @ (_: CaseClass) => handleCaseClassMethod(obj)
-   * or
-   * obj @ (_: CaseObject) => handleCaseObjectMethod(obj)
-   */
-  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree = {
-    import c.universe._
-    cq"${TermName(varBeMatched)} : $ct => $handlerQuote"
+    (handleCaseClassMethQuote, patternToCallCaseClass)
   }
 
   /**

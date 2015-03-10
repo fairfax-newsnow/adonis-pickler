@@ -264,43 +264,27 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  /**
-   * Quote of method definition that creates a "case object" of tpe, it will be something like
-   */
-  def handleCaseObjDefQuote(c: Context)(tpe: c.universe.Type)(tpeFormattedInJson: String)(methodNm: c.universe.TermName)(allChildrenAreObjs: Boolean): c.universe.Tree = {
-    this.synchronized {
-      import c.universe._
-      q"def $methodNm = ${tpe.typeSymbol.asClass.module}"
-    }
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
+    import c.universe._
+    val method: TermName = methdNameOfHandleItem(tpeInJson)
+    val handleCaseObjMethQuote = q"def $method = ${tpe.typeSymbol.asClass.module}"
+    val patternToCallCaseObj = cq"$tpeInJson => $method"
+    
+    (handleCaseObjMethQuote, patternToCallCaseObj)
   }
 
-  /**
-   * Quote of method definition that creates an case class object of type ct, it will be seomthing like
-   * def $methodNm(item: J) = ???
-   */
-  def handleCaseClassDefQuote(c: Context)(method: c.universe.TermName)(ct: c.universe.Type)(fieldNm: c.universe.TermName): c.universe.Tree = {
+  def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
-    q"""
-      def $method(item: ${TypeName("J")}) = 
-        JsonRegistry.parse(item, "", Some(${ct.toString})).asInstanceOf[$ct]
-    """
-  }
-
-  /**
-   * Quote of call to method which is the method that parse the case class of a trait
-   */
-  def handleCaseClassCallQuote(c: Context)(handleCaseClassMeth: c.universe.TermName)(objNm: c.universe.TermName): c.universe.Tree = {
-    import c.universe._
-    q"""$handleCaseClassMeth(${jsonIo(c)}.readObjectField($objNm, "v"))"""
-  }
-
-  /**
-   * Quote that maps a pattern to the corresponding handler, it will be someething like
-   * s"$pattern" => handler
-   */
-  def patternToHandlerQuote(c: Context)(ct: c.universe.Type)(pattern: String)(handlerQuote: c.universe.Tree): c.universe.Tree = {
-    import c.universe._
-    cq"$pattern => $handlerQuote"
+    val tpeString = tpe.toString
+    val method: TermName = methdNameOfHandleItem(tpeString)
+    val handleCaseClassMethQuote =
+      q"""
+        def $method(item: ${TypeName("J")}) = 
+          JsonRegistry.parse(item, "", Some($tpeString)).asInstanceOf[$tpe]
+      """
+    val patternToCallCaseClass = cq"""${simpleTypeNm(tpeString)} => $method(${jsonIo(c)}.readObjectField($objNm, "v"))"""
+    
+    (handleCaseClassMethQuote, patternToCallCaseClass)
   }
 
   /**
