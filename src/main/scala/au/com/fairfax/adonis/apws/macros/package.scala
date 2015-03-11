@@ -15,6 +15,9 @@ package object macros {
       case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
     }.toList
   }
+  
+  def noAccessor(c: Context)(tpe: c.universe.Type): Boolean =
+    getAccessors(c)(tpe).isEmpty
 
   def tpeClassNm(c: Context): c.universe.Type => String = _.dealias.typeSymbol.asClass.name.toString
 

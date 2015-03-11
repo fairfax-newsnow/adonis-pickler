@@ -241,6 +241,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     }
   }
 
+  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = 
+    handleCaseObjectAndCallQuote(c)(tpe)(tpeInJson)(allChildrenAreObjs)
+
   def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
     val method: TermName = methdNameOfHandleItem(tpeInJson)
@@ -252,7 +255,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     
     val handleCaseObjMethQuote = q"def $method = $methodImplQuote"
     val patternToCallCaseObj = cq"_: $tpe => $method"
-    
     (handleCaseObjMethQuote, patternToCallCaseObj)
   }
   
@@ -269,7 +271,6 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
     val handleCaseClassMethQuote = q"def $method($objNm: $tpe) = $methImplQuote"
     val patternToCallCaseClass = cq"$objNm : $tpe => $method($objNm)"
-    
     (handleCaseClassMethQuote, patternToCallCaseClass)
   }
 
