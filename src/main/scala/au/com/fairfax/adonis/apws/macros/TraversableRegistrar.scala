@@ -108,7 +108,7 @@ object TraversableRegistrar {
 
       // a sealed trait
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        getSealedTraitChildren(c)(traitTpe).withFilter(ct => !(ct.typeSymbol.isModuleClass)).map {
+        getSealedTraitChildren(c)(traitTpe).withFilter(ct => !ct.typeSymbol.isModuleClass && !noAccessor(c)(ct)).map {
           childParserFormatter(c)(_)
         }.foldLeft[Tree](q"Nil") {
           (z, accessorQuote) => q"$z ::: $accessorQuote"

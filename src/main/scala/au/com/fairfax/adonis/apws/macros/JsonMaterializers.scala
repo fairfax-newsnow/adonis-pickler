@@ -115,6 +115,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree)
   
+  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree)
+  
   def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
@@ -165,16 +167,21 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         val childTypes = getSealedTraitChildren(c)(traitTpe)
 
-        val allChildrenAreObjs = childTypes forall (_.typeSymbol.isModuleClass)
+        val allChildrenAreObjs = childTypes forall (ct => ct.typeSymbol.isModuleClass || noAccessor(c)(ct))
 
         val (handleChildQuote, patternToCallChildQuotes) = childTypes.map {
           ct =>
             // if ct is a case object, the type name will end with ".type" and should be trimmed off
             val ctString = simpleTypeNm(ct.toString).replace(".type", "")
-            if (ct.typeSymbol.isModuleClass)
-              handleCaseObjectAndCallQuote(c)(ct)(ctString)(allChildrenAreObjs)
-            else
-              handleCaseClassAndCallQuote(c)(ct)(objNm)(fieldNm)
+            ct match {
+              case tpe if tpe.typeSymbol.isModuleClass =>
+                handleCaseObjectAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
+              case tpe if noAccessor(c)(tpe) =>
+                println(s"before handleEmptyCaseClassAndCallQuote")
+                handleEmptyCaseClassAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
+              case _ =>
+                handleCaseClassAndCallQuote(c)(ct)(objNm)(fieldNm)
+            }
         }.unzip
 
         val traitMethImplQuote =

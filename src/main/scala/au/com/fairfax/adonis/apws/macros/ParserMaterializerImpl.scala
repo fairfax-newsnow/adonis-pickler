@@ -264,12 +264,19 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
+  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
+    import c.universe._
+    val method: TermName = methdNameOfHandleItem(tpeInJson)
+    val handleMethQuote = q"def $method = new $tpe"
+    val patternToCallCaseObj = cq"$tpeInJson => $method"
+    (handleMethQuote, patternToCallCaseObj)
+  }
+
   def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
     val method: TermName = methdNameOfHandleItem(tpeInJson)
     val handleCaseObjMethQuote = q"def $method = ${tpe.typeSymbol.asClass.module}"
     val patternToCallCaseObj = cq"$tpeInJson => $method"
-    
     (handleCaseObjMethQuote, patternToCallCaseObj)
   }
 
@@ -283,7 +290,6 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           JsonRegistry.parse(item, "", Some($tpeString)).asInstanceOf[$tpe]
       """
     val patternToCallCaseClass = cq"""${simpleTypeNm(tpeString)} => $method(${jsonIo(c)}.readObjectField($objNm, "v"))"""
-    
     (handleCaseClassMethQuote, patternToCallCaseClass)
   }
 
