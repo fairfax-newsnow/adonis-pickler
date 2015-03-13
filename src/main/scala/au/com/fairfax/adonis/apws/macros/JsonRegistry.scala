@@ -44,7 +44,7 @@ class BaseJsonRegistry extends JsonRegistry {
     val typeKey = keyProvider.key
     formatters.get {
       typeKey match {
-        case "T" => toMapKey(className[T])
+        case "T" | "scala.Any" => toMapKey(className[T])
         case k if strReplacement.exists(k contains _._1) => toMapKey(k)
         case _ => typeKey
       }
