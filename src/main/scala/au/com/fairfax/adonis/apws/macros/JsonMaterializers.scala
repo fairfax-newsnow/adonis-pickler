@@ -6,6 +6,7 @@ import scala.reflect.macros.blackbox.Context
 import scala.language.higherKinds
 import au.com.fairfax.adonis.utils.simpleTypeNm
 import au.com.fairfax.adonis.apws.types.Enum
+import scala.language.existentials
 
 object Materializer {
   /**
@@ -167,6 +168,12 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
         val childTypes = getSealedTraitChildren(c)(traitTpe)
 
+        if (childTypes.isEmpty) {
+          println(s"JsonMaterializers(), $traitTpe has no child")
+          throw new Error("JsonMaterializers(), $traitTpe has no child")
+        }
+        require(childTypes.nonEmpty)
+
         val allChildrenAreObjs = childTypes forall (ct => ct.typeSymbol.isModuleClass || noAccessor(c)(ct))
 
         val (handleChildQuote, patternToCallChildQuotes) = childTypes.map {
@@ -177,7 +184,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
               case tpe if tpe.typeSymbol.isModuleClass =>
                 handleCaseObjectAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
               case tpe if noAccessor(c)(tpe) =>
-                println(s"before handleEmptyCaseClassAndCallQuote")
                 handleEmptyCaseClassAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
               case _ =>
                 handleCaseClassAndCallQuote(c)(ct)(objNm)(fieldNm)
