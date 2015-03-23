@@ -123,6 +123,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   final def matchObjTpeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
+    
+    lazy val accessors = getAccessors(c)(tpe)
 
     tpe match {
       // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
@@ -195,20 +197,17 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         traitFamilyMethDefAndCallQuote(c)(traitTpe)(objNm)(fieldNm)(traitMethImplQuote)
 
       // a structured type
-      case _ =>
-        val accessors = getAccessors(c)(tpe)
-        accessors match {
-          case x :: _ =>
-            val accessorQuotes = accessors map {
-              accessor =>
-                val accessorField = accessor.name.toString
-                val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
-                eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
-            }
-            structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
-          case other =>
-            throw new Error("Can't match: " + tpe)
+      case _ if accessors.nonEmpty =>
+        val accessorQuotes = accessors map {
+          accessor =>
+            val accessorField = accessor.name.toString
+            val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
+            eachAccessorQuote(c)(accessorTpe)(objNm)(fieldNm)(accessorField)
         }
+        structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
+
+      case _ => 
+        throw new IllegalArgumentException(s"Can't match $tpe")
     }
   }
 
