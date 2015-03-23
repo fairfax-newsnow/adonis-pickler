@@ -38,13 +38,17 @@ class BaseJsonRegistry extends JsonRegistry {
         val (key, parser, formatter) = t
         parsers += (key -> parser)
         formatters += (key -> formatter)
+//        println(
+//          s"""formatters =
+//             |$formatters
+//           """.stripMargin)
     }
 
   def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val typeKey = keyProvider.key
     formatters.get {
       typeKey match {
-        case "T" | "scala.Any" => toMapKey(className[T])
+        case "T" => toMapKey(className[T])
         case k if strReplacement.exists(k contains _._1) => toMapKey(k)
         case _ => typeKey
       }
@@ -57,16 +61,27 @@ class BaseJsonRegistry extends JsonRegistry {
    * A function that should be called by a generated formatter only, the reason is the the formatter can provide the typeKey information without 
    * using a TypeKeyProvider.  Using TypeKeyProvider needs macro which results in high memory usage  
    */
-  def internalFormat[J](obj: Any, nameOfFormattedField: String, topObj: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J =
+  def internalFormat[J](obj: Any, nameOfFormattedField: String, includeTpeInJson: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J = {
+    lazy val objClassName = obj.getClass.getName.replace('$', '.')
+    
     formatters.get(typeKey).fold {
-      throw new Error(s"No formatter exists for $typeKey")
-    }(_.format(obj)(nameOfFormattedField)(topObj))
+      // typeKey is probably Any or non-sealed trait, therefore objClassName is used
+      formatters.get(objClassName).fold {
+        throw new Error(s"No formatter exists for $typeKey or $objClassName")
+      }(_.format(obj)("v")(true)) // includeTpeInJson is true, o.w. the parser won't known which concrete class to parse
+    }(_.format(obj)(nameOfFormattedField)(includeTpeInJson))
+  }
 
   def parse[J](json: J, nameOfParsedField: String = "args", objTpe: Option[String] = None)(implicit reader: JReader[J]): Any = {
     val cmdType = objTpe getOrElse reader.readString(reader.readObjectField(json, "t"))
-    val key = toMapKey(cmdType)
-    parsers.get(key).fold {
-      throw new Error(s"No parser exists for $key")
+    val typeKey = toMapKey(cmdType)
+    lazy val jsonForConcreteType = reader.readObjectField(json, nameOfParsedField)
+    lazy val concreteType = reader.readString(reader.readObjectField(jsonForConcreteType, "t"))
+    
+    parsers.get(typeKey).fold {
+      parsers.get(concreteType).fold {
+        throw new Error(s"No parser exists for $typeKey or $concreteType")
+      } (_.parse(jsonForConcreteType)("v"))
     } { _.parse(json)(nameOfParsedField) }
   }
 

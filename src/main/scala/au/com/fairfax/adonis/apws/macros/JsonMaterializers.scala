@@ -27,12 +27,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def jsonIo(c: Context): c.universe.TermName
 
-  def deliasTpeName[T: c.universe.TypeTag](c: Context): String =
-    c.universe.typeOf[T].dealias.toString
-
-  def numDealisTpeNms(c: Context) =
-    List(deliasTpeName[Double](c), deliasTpeName[Float](c), deliasTpeName[Short](c), deliasTpeName[Int](c), deliasTpeName[Long](c))
-
   /**
    * Qutoe of method definition that handle an Item
    */

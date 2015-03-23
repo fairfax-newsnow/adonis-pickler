@@ -15,7 +15,13 @@ package object macros {
       case acc: MethodSymbol if tpe.typeSymbol.asClass.isCaseClass && acc.isCaseAccessor || !tpe.typeSymbol.asClass.isCaseClass && acc.isParamAccessor => acc
     }.toList
   }
-  
+
+  def deliasTpeName[T: c.universe.TypeTag](c: Context): String =
+    c.universe.typeOf[T].dealias.toString
+
+  def numDealisTpeNms(c: Context) =
+    List(deliasTpeName[Double](c), deliasTpeName[Float](c), deliasTpeName[Short](c), deliasTpeName[Int](c), deliasTpeName[Long](c))
+
   def noAccessor(c: Context)(tpe: c.universe.Type): Boolean =
     getAccessors(c)(tpe).isEmpty
 

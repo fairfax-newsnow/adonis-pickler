@@ -1,5 +1,7 @@
 package au.com.fairfax.adonis.apws.macros
 
+import au.com.fairfax.adonis.apws.types.Enum
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
@@ -62,8 +64,6 @@ object TraversableRegistrar {
     import c.universe._
     val tpe = weakTypeOf[T]
 
-    val (parser, formatter) = parserFormatterQuote(c)(tpe)
-
     q"""
       import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
       import au.com.fairfax.adonis.apws.macros.JsonRegistry
@@ -72,58 +72,77 @@ object TraversableRegistrar {
       
       implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe}] {
         val traversableRegister: List[(String, JsonParser[_], JsonFormatter[_])] =
-          ($keyBeAdded, $parser, $formatter) :: ${traverseChildrenQuote(c)(tpe)}
+          ${traverseQuote(c)(tpe)(keyBeAdded)}
       }
 
       GenTraversableRegistrar
     """
   }
 
-  private def traverseChildrenQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+  private def traverseQuote(c: Context)(tpe: c.universe.Type)(keyBeAdded: String): c.universe.Tree = {
     import c.universe._
 
     lazy val accessors: List[MethodSymbol] = getAccessors(c)(tpe)
+    lazy val (parser, formatter) = parserFormatterQuote(c)(tpe)
 
     tpe match {
+      // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
+      case t: Type if t <:< c.mirror.typeOf[Enum] =>
+        q"List(($keyBeAdded, $parser, $formatter))"
+
+      case t: Type if numDealisTpeNms(c) contains t.dealias.toString =>
+        q"List(($keyBeAdded, $parser, $formatter))"
+
+      // string type
+      case t: Type if deliasTpeName[String](c) == t.dealias.toString =>
+        q"List(($keyBeAdded, $parser, $formatter))"
+
+      // boolean type
+      case t: Type if deliasTpeName[Boolean](c) == t.dealias.toString =>
+        q"List(($keyBeAdded, $parser, $formatter))"
+
       // a collection type
       case collectionTpe: Type if collTypes(c) contains tpeClassNm(c)(collectionTpe) =>
         val itemTpe = collectionTpe.typeArgs.head
-        childParserFormatter(c)(itemTpe)
+        q"($keyBeAdded, $parser, $formatter) :: ${childParserFormatter(c)(itemTpe)}"
 
       // a map type
       case mapTpe: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(mapTpe) =>
         val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
-        q"${childParserFormatter(c)(keyTpe)} ::: ${childParserFormatter(c)(valTpe)}"
+        q"($keyBeAdded, $parser, $formatter) :: ${childParserFormatter(c)(keyTpe)} ::: ${childParserFormatter(c)(valTpe)}"
 
       // an option type
       case optionTpe: Type if tpeClassNm(c)(typeOf[Option[_]]) == tpeClassNm(c)(optionTpe) =>
         val itemTpe = optionTpe.typeArgs.head
-        childParserFormatter(c)(itemTpe)
+        q"($keyBeAdded, $parser, $formatter) :: ${childParserFormatter(c)(itemTpe)}"
 
       // an either type
       case eitherTpe: Type if tpeClassNm(c)(typeOf[Either[_, _]]) == tpeClassNm(c)(eitherTpe) =>
         val leftTpe = eitherTpe.dealias.typeArgs.head
         val rightTpe = eitherTpe.dealias.typeArgs.last
-        q"${childParserFormatter(c)(leftTpe)} ::: ${childParserFormatter(c)(rightTpe)}"
+        q"($keyBeAdded, $parser, $formatter) :: ${childParserFormatter(c)(leftTpe)} ::: ${childParserFormatter(c)(rightTpe)}"
 
       // a sealed trait
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        getSealedTraitChildren(c)(traitTpe).withFilter(ct => !ct.typeSymbol.isModuleClass && !noAccessor(c)(ct)).map {
+        val childrenQuote = getSealedTraitChildren(c)(traitTpe).withFilter(ct => !ct.typeSymbol.isModuleClass && !noAccessor(c)(ct)).map {
           childParserFormatter(c)(_)
         }.foldLeft[Tree](q"Nil") {
           (z, accessorQuote) => q"$z ::: $accessorQuote"
         }
+        q"($keyBeAdded, $parser, $formatter) :: $childrenQuote"
 
       // a structured type
       case _ if accessors.nonEmpty =>
-        accessors.map {
+        val accessorsQuote = accessors.map {
           accessor =>
             val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
             childParserFormatter(c)(accessorTpe)
         }.foldLeft[Tree](q"Nil") {
           (z, accessorQuote) => q"$z ::: $accessorQuote"
         }
+        q"($keyBeAdded, $parser, $formatter) :: $accessorsQuote"
 
+      // likely Any or unsealed trait
       case _ => q"Nil"
     }
   }
@@ -135,8 +154,7 @@ object TraversableRegistrar {
       q"Nil"
     else {
       ParserFormatterTracker add tpeName
-      val (parser, formatter) = parserFormatterQuote(c)(tpe)
-      q"($tpeName, $parser, $formatter) :: ${traverseChildrenQuote(c)(tpe)}"
+      traverseQuote(c)(tpe)(tpeName)
     }
   }
 }

@@ -328,10 +328,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
         import au.com.fairfax.adonis.apws.macros.JsonRegistry
 
-        override def format[J](obj: Any)(nameOfFormattedField: String)(topObj: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+        override def format[J](obj: Any)(nameOfFormattedField: String)(includeTpeInJson: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
           val formattedField = ${matchObjTpeQuote(c)(tpe)("typedObj")("")}
-          if (topObj)
+          if (includeTpeInJson)
             ${jsonIo(c)}.makeObject( "t" -> ${jsonIo(c)}.makeString(${tpe.toString}), nameOfFormattedField -> formattedField )
           else
             formattedField
