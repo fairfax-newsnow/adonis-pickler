@@ -322,6 +322,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def caseObjQuote(c: Context)(caseObjTpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"""${jsonIo(c)}.makeString("")"""
+  }
+
+  def emptyCaseClassQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree =
+    caseObjQuote(c)(tpe)
+
   def formatterQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
       q"""

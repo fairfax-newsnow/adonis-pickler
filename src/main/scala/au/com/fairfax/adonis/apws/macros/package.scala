@@ -31,6 +31,11 @@ package object macros {
     import c.universe._
     List(typeOf[List[_]], typeOf[Vector[_]], typeOf[Seq[_]]) map tpeClassNm(c)
   }
+  
+  def isCaseClass(c: Context)(tpe: c.universe.Type): Boolean =
+    tpe.typeSymbol.isClass && 
+      tpe.typeSymbol.asClass.isCaseClass &&
+        !tpe.typeSymbol.isModuleClass
 
   lazy val strConversion: String Map String =
     (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {

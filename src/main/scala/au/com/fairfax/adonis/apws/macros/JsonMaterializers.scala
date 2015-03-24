@@ -116,6 +116,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
+  def caseObjQuote(c: Context)(caseObjTpe: c.universe.Type): c.universe.Tree
+
+  def emptyCaseClassQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree
+
   /**
    * Quote to handle an enum object
    */
@@ -197,7 +201,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         traitFamilyMethDefAndCallQuote(c)(traitTpe)(objNm)(fieldNm)(traitMethImplQuote)
 
       // a structured type
-      case _ if accessors.nonEmpty =>
+      case t: Type if isCaseClass(c)(t) && accessors.nonEmpty =>
         val accessorQuotes = accessors map {
           accessor =>
             val accessorField = accessor.name.toString
@@ -206,11 +210,20 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         }
         structuredTypeQuote(c)(tpe)(objNm)(fieldNm)(accessorQuotes)
 
-      case _ => 
+      // empty case class
+      case t: Type if isCaseClass(c)(t) =>
+        emptyCaseClassQuote(c)(t)
+
+      // a case object
+      case t: Type if t.typeSymbol.isModuleClass =>
+        caseObjQuote(c)(t)
+
+      // Any, AnyRef, non-sealed trait, abstract class, just class
+      case _ =>
         throw new IllegalArgumentException(s"Can't match $tpe")
     }
   }
-
+  
 }
 
 trait ParserMaterializer {

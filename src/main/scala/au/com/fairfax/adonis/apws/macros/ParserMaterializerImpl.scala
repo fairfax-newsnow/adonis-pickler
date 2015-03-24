@@ -363,6 +363,16 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
+
+  def caseObjQuote(c: Context)(caseObjTpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"${caseObjTpe.typeSymbol.asClass.module}"
+  }
+
+  def emptyCaseClassQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    q"new $tpe"
+  }
   
   def parserQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._

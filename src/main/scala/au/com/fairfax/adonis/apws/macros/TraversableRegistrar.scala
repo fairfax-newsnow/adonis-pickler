@@ -34,7 +34,7 @@ object TraversableRegistrar {
     import c.universe._
     val tpe = weakTypeOf[T]
     val tpeStr = toMapKey(tpe.toString)
-
+    
     val result =
       if (ParserFormatterTracker contains tpeStr)
         alreadyRegisteredQuote(c)(tpe)
@@ -86,7 +86,6 @@ object TraversableRegistrar {
     lazy val (parser, formatter) = parserFormatterQuote(c)(tpe)
 
     tpe match {
-      // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         q"List(($keyBeAdded, $parser, $formatter))"
 
@@ -132,7 +131,7 @@ object TraversableRegistrar {
         q"($keyBeAdded, $parser, $formatter) :: $childrenQuote"
 
       // a structured type
-      case _ if accessors.nonEmpty =>
+      case t: Type if isCaseClass(c)(t) && accessors.nonEmpty =>
         val accessorsQuote = accessors.map {
           accessor =>
             val accessorTpe = accessor.returnType.substituteTypes(tpe.typeConstructor.typeParams, tpe.typeArgs)
@@ -142,8 +141,18 @@ object TraversableRegistrar {
         }
         q"($keyBeAdded, $parser, $formatter) :: $accessorsQuote"
 
-      // likely Any or unsealed trait
-      case _ => q"Nil"
+      // empty case class
+      case t: Type if isCaseClass(c)(t) =>
+        q"List(($keyBeAdded, $parser, $formatter))"
+
+      // a case object
+      case caseObjTpe: Type if caseObjTpe.typeSymbol.isModuleClass =>
+        println(s"TraversableRegistrar, case object $caseObjTpe")
+        q"List(($keyBeAdded, $parser, $formatter))"
+
+      // Any, AnyRef, non-sealed trait, abstract class, just class
+      case _ =>
+        q"Nil"
     }
   }
 
