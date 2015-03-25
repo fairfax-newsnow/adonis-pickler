@@ -123,7 +123,7 @@ object TraversableRegistrar {
 
       // a sealed trait
       case traitTpe: Type if traitTpe.typeSymbol.asInstanceOf[scala.reflect.internal.Symbols#Symbol].isSealed =>
-        val childrenQuote = getSealedTraitChildren(c)(traitTpe).withFilter(ct => !ct.typeSymbol.isModuleClass && !noAccessor(c)(ct)).map {
+        val childrenQuote = getSealedTraitChildren(c)(traitTpe).map {
           childParserFormatter(c)(_)
         }.foldLeft[Tree](q"Nil") {
           (z, accessorQuote) => q"$z ::: $accessorQuote"
@@ -147,7 +147,6 @@ object TraversableRegistrar {
 
       // a case object
       case caseObjTpe: Type if caseObjTpe.typeSymbol.isModuleClass =>
-        println(s"TraversableRegistrar, case object $caseObjTpe")
         q"List(($keyBeAdded, $parser, $formatter))"
 
       // Any, AnyRef, non-sealed trait, abstract class, just class
