@@ -14,9 +14,13 @@ trait CaseEnum[T <: Enum] {
 
   def values: Seq[T]
 
-  lazy val nameMap: String Map T = values.map( choice =>
-    choice.toString -> choice
-  ).toMap.withDefaultValue(values.head)
+  lazy val nameMap: String Map T = values.map { choice =>
+    ({
+      val choiceStr = choice.toString
+      if (choiceStr endsWith "$") choiceStr.substring(0, choiceStr.length - 1) else choiceStr
+    } -> choice)
+  }.toMap.withDefaultValue(values.head)
+
 
   def withName(name: String): T = nameMap(name.toUpperCase)
 
