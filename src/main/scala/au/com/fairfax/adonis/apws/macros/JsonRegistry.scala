@@ -62,12 +62,16 @@ class BaseJsonRegistry extends JsonRegistry {
    * using a TypeKeyProvider.  Using TypeKeyProvider needs macro which results in high memory usage  
    */
   def internalFormat[J](obj: Any, nameOfFormattedField: String, includeTpeInJson: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J = {
-    lazy val objClassName = obj.getClass.getName.replace('$', '.')
+    lazy val objClassName = {
+      val className = obj.getClass.getName.replace('$', '.')
+      if (className endsWith ".") className + "type" // this a case object, key should be ended with ".type"
+      else className
+    }
     
     formatters.get(typeKey).fold {
       // typeKey is probably Any or non-sealed trait, therefore objClassName is used
       formatters.get(objClassName).fold {
-        throw new Error(s"No formatter exists for $typeKey or $objClassName")
+        throw new Error(s"No formatter exists for $typeKey or $objClassName derived from object of class name ${obj.getClass}.replace('$$', '.')")
       }(_.format(obj)("v")(true)) // includeTpeInJson is true, o.w. the parser won't known which concrete class to parse
     }(_.format(obj)(nameOfFormattedField)(includeTpeInJson))
   }
