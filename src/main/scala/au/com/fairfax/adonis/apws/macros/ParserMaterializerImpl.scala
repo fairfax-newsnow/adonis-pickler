@@ -264,7 +264,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     """
   }
 
-  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
+  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
     val method: TermName = methdNameOfHandleItem(tpeInJson)
     val handleMethQuote = q"def $method = new $tpe"
@@ -272,7 +272,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     (handleMethQuote, patternToCallCaseObj)
   }
 
-  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree) = {
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String): (c.universe.Tree, c.universe.Tree) = {
     import c.universe._
     val method: TermName = methdNameOfHandleItem(tpeInJson)
     val handleCaseObjMethQuote = q"def $method = ${tpe.typeSymbol.asClass.module}"
@@ -306,15 +306,8 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *  case "CaseClass2" => handle_CaseClass2(reader.readObjectField(objNm, "v"))
    * }
    */
-  def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
+  def ptnMatchQuoteForTraitFamily(c: Context)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
-    if (onlyCaseObjects)
-      q"""
-        ${jsonIo(c)}.readString($objNm) match {
-          case ..$patternToHandlerQuotes
-        }
-      """
-    else
       q"""
         ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField($objNm, "t")) match {
           case ..$patternToHandlerQuotes

@@ -106,13 +106,13 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
 
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree
 
-  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree)
+  def handleCaseObjectAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String): (c.universe.Tree, c.universe.Tree)
 
   def handleCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): (c.universe.Tree, c.universe.Tree)
   
-  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String)(allChildrenAreObjs: Boolean): (c.universe.Tree, c.universe.Tree)
+  def handleEmptyCaseClassAndCallQuote(c: Context)(tpe: c.universe.Type)(tpeInJson: String): (c.universe.Tree, c.universe.Tree)
   
-  def ptnMatchQuoteForTraitFamily(c: Context)(onlyCaseObjects: Boolean)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
+  def ptnMatchQuoteForTraitFamily(c: Context)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree
 
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree
 
@@ -174,17 +174,15 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         }
         require(childTypes.nonEmpty)
 
-        val allChildrenAreObjs = childTypes forall (ct => ct.typeSymbol.isModuleClass || noAccessor(c)(ct))
-
         val (handleChildQuote, patternToCallChildQuotes) = childTypes.map {
           ct =>
             // if ct is a case object, the type name will end with ".type" and should be trimmed off
             val ctString = simpleTypeNm(ct.toString).replace(".type", "")
             ct match {
               case tpe if tpe.typeSymbol.isModuleClass =>
-                handleCaseObjectAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
+                handleCaseObjectAndCallQuote(c)(tpe)(ctString)
               case tpe if noAccessor(c)(tpe) =>
-                handleEmptyCaseClassAndCallQuote(c)(tpe)(ctString)(allChildrenAreObjs)
+                handleEmptyCaseClassAndCallQuote(c)(tpe)(ctString)
               case _ =>
                 handleCaseClassAndCallQuote(c)(ct)(objNm)(fieldNm)
             }
@@ -194,7 +192,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
           quoteWithNullCheck(c)(varOfNullCheck = objNm) {
             q"""
               ..$handleChildQuote
-              ${ptnMatchQuoteForTraitFamily(c)(allChildrenAreObjs)(patternToCallChildQuotes)(objNm)}
+              ${ptnMatchQuoteForTraitFamily(c)(patternToCallChildQuotes)(objNm)}
             """
           }
 
