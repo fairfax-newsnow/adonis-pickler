@@ -38,10 +38,10 @@ class BaseJsonRegistry extends JsonRegistry {
         val (key, parser, formatter) = t
         parsers += (key -> parser)
         formatters += (key -> formatter)
-//        println(
-//          s"""formatters =
-//             |$formatters
-//           """.stripMargin)
+        println(
+          s"""formatters =
+             |$formatters
+           """.stripMargin)
     }
 
   def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
