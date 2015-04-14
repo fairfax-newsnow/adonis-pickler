@@ -28,12 +28,6 @@ trait CaseEnum[T <: Enum] {
 
 trait Enum {
 
-  override lazy val toString = {
-    val simpleClassName = getSimpleName(this.getClass).toUpperCase
-    
-    if (simpleClassName contains "$")
-      simpleClassName.dropWhile(_ != '$').drop(1)
-    else
-      simpleClassName
-  }
+  override lazy val toString =
+    getSimpleName(this.getClass).toUpperCase.dropWhile(_ != '$').drop(1)
 }
