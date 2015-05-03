@@ -1,10 +1,10 @@
-package au.com.fairfax.adonis.apws.macros
+package au.com.fairfax.pickler.macros
 
 import scala.collection.mutable.{HashMap => MHashMap}
+import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox.Context
-import scala.language.existentials
 
 trait TypeKeyProvider[T] {
   def key: String
@@ -96,7 +96,7 @@ object TypeKeyProvider {
     import c.universe._
     val typeTag = c.universe.weakTypeOf[T]
     q"""
-      val provider = new au.com.fairfax.adonis.apws.macros.TypeKeyProvider[$typeTag] {
+      val provider = new au.com.fairfax.pickler.macros.TypeKeyProvider[$typeTag] {
         def key: String = ${typeTag.toString()}
       }
       provider

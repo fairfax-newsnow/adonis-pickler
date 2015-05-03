@@ -1,31 +1,10 @@
-package au.com.fairfax.adonis.apws.macros
+package au.com.fairfax.pickler.macros
+
+import au.com.fairfax.pickler.macros.Materializer._
+import au.com.fairfax.pickler.simpleTypeNm
 
 import scala.reflect.macros.blackbox.Context
-import Materializer._
-import au.com.fairfax.adonis.utils.simpleTypeNm
 
-/**
- * e.g. case class IntWrapper(i: Int), this is a structure class having an integer field, therefore the code will be generated as  
- * calls recurQuote, the type is matched to a structured type having only 1 accessorField.  The generated code will be:
- *  
- * implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[IntWrapper] {
- *   override def parse[J](json: J)(implicit reader: au.com.fairfax.adonis.apws.macros.JReader[J]) = {
- *     def parseJsSerialised(jsSerialised: J) = au.com.fairfax.adonis.apws.macros.JsonRegistry.parse[J](jsSerialised);
- *          
- *     {
- *       val json_args = reader.readObjectField(json, "args");  // from structuredTypeQuote()
- *       if (reader.isNull(json_args))                          // from structuredTypeQuote()
- *         throw new IllegalArgumentException("The json data contains a null attribute which is not mapped to an Option[_] attribute")  // from structuredTypeQuote() 
- *       else                     // from structuredTypeQuote()
- *         new IntWrapper(        // from structuredTypeQuote()
- *           reader.readNumber(   // from eachAccessorQuote and then numericValQuote()
- *             reader.readObjectField(json_args, "i")).asInstanceOf[Int]  // numericValQuote() and then fieldQuote()
- *         )
- *     }
- *   };
- * };
- * GenJsonParser
- */
 object ParserMaterializerImpl extends Materializer[JsonParser] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("reader")
 
@@ -76,7 +55,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
     // if it's not Seq but, say, List, append .toList to the quote
     val toCollQuote =
-      if (collType == tpeClassNm(c)(typeOf[Seq[_]]))
+      if (collType == TypeName(tpeClassNm(c)(typeOf[Seq[_]])))
         intsToItemsQuote
       else
         q"""${intsToItemsQuote}.${TermName("to" + collType)}"""
@@ -155,7 +134,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       def parseEither(json: J): Either[$leftTpe, $rightTpe] = {
         val value = ${jsonIo(c)}.readObjectField(json, "v")
         val providedTypeName = ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField(json, "t"))
-        au.com.fairfax.adonis.utils.simpleTypeNm(providedTypeName) match {
+        au.com.fairfax.pickler.simpleTypeNm(providedTypeName) match {
           case $simpleLeftTpe => Left(JsonRegistry.parse(value, "", Some(${leftTpe.toString})).asInstanceOf[$leftTpe])
           case $simpleRightTpe => Right(JsonRegistry.parse(value, "", Some(${rightTpe.toString})).asInstanceOf[$rightTpe])
           case missed => throw new Error("Can't match: " + missed)
@@ -339,7 +318,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *    reader.readString(objNm_fieldNm)
    *   }
    * }
-   * au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum(values.this.StoryStatus.Value, caseEnumName)
+   * au.com.fairfax.pickler.types.CaseEnum.makeEnum(values.this.StoryStatus.Value, caseEnumName)
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -353,7 +332,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
     q"""
       val caseEnumName = ${stringQuote(c)(objNm)(fieldNm)}
-      au.com.fairfax.adonis.apws.types.CaseEnum.makeEnum($companion, caseEnumName)
+      au.com.fairfax.pickler.types.CaseEnum.makeEnum($companion, caseEnumName)
     """
   }
 
@@ -370,9 +349,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   def parserQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
       q"""
-        implicit object GenJsonParser extends au.com.fairfax.adonis.apws.macros.JsonParser[${tpe.dealias}] {
-          import au.com.fairfax.adonis.apws.macros.JsonRegistry
-          import au.com.fairfax.adonis.apws.macros.JReader
+        implicit object GenJsonParser extends au.com.fairfax.pickler.macros.JsonParser[${tpe.dealias}] {
+          import au.com.fairfax.pickler.macros.JsonRegistry
+          import au.com.fairfax.pickler.macros.JReader
 
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
             ${matchObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}

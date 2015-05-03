@@ -1,0 +1,19 @@
+# SBT
+**/target/
+.history
+
+# MacOS
+.DS_Store
+
+.idea/*
+**/.idea/*
+**/.cache
+**/.classpath
+**/.project
+**/.settings/*
+**/bin
+**/logs/*
+**/.idea_modules/*
+
+# IDEA UML file
+*.uml

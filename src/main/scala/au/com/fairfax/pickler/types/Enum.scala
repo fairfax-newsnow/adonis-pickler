@@ -1,7 +1,6 @@
-package au.com.fairfax.adonis.apws.types
+package au.com.fairfax.pickler.types
 
-import au.com.fairfax.adonis.utils._
-
+import au.com.fairfax.pickler.simpleTypeNm
 
 object CaseEnum {
 
@@ -28,6 +27,7 @@ trait CaseEnum[T <: Enum] {
 
 trait Enum {
 
-  override lazy val toString =
-    getSimpleName(this.getClass).toUpperCase.dropWhile(_ != '$').drop(1)
+  override lazy val toString = {
+    simpleTypeNm(getClass.getName).toUpperCase.dropWhile(_ != '$').drop(1)
+  }
 }

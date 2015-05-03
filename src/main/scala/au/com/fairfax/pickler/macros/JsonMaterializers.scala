@@ -1,12 +1,11 @@
 
-package au.com.fairfax.adonis.apws.macros
+package au.com.fairfax.pickler.macros
 
 import scala.language.experimental.macros
+import scala.language.{existentials, higherKinds}
 import scala.reflect.macros.blackbox.Context
-import scala.language.higherKinds
-import au.com.fairfax.adonis.utils.simpleTypeNm
-import au.com.fairfax.adonis.apws.types.Enum
-import scala.language.existentials
+import au.com.fairfax.pickler.types._
+import au.com.fairfax.pickler.simpleTypeNm
 
 object Materializer {
   /**
@@ -19,8 +18,6 @@ object Materializer {
 }
 
 trait Materializer[FP[_] <: FormatterParser[_]] {
-
-  import Materializer._
 
   /**
    * @return "reader" if this is parser, o.w. "builder"
@@ -131,7 +128,7 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
     lazy val accessors = getAccessors(c)(tpe)
 
     tpe match {
-      // an enum type represented by au.com.fairfax.adonis.apws.types.Enum
+      // an enum type represented by au.com.fairfax.pickler.macros.Enum
       case t: Type if t <:< c.mirror.typeOf[Enum] =>
         enumObjQuote(c)(t)(objNm)(fieldNm)
 

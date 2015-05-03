@@ -1,6 +1,4 @@
-package au.com.fairfax.adonis.apws
-
-import au.com.fairfax.adonis.utils._
+package au.com.fairfax.pickler
 
 import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox.Context
@@ -37,7 +35,7 @@ package object macros {
       tpe.typeSymbol.asClass.isCaseClass &&
         !tpe.typeSymbol.isModuleClass
 
-  lazy val strConversion: String Map String =
+  private lazy val strConversion: String Map String =
     (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
       s => s -> s.capitalize
     } ::: List(className[String]).map{
@@ -64,4 +62,5 @@ package object macros {
       des => des.isSealed || tpeClassNm(c)(traitTpe) == tpeClassNm(c)(des.asInstanceOf[Symbol].asType.toType)
     }.map(_.asInstanceOf[Symbol].asType.toType)
   }
+
 }

@@ -1,33 +1,10 @@
-package au.com.fairfax.adonis.apws.macros
+package au.com.fairfax.pickler.macros
+
+import au.com.fairfax.pickler.macros.Materializer._
+import au.com.fairfax.pickler.simpleTypeNm
 
 import scala.reflect.macros.blackbox.Context
-import au.com.fairfax.adonis.utils.simpleTypeNm
-import Materializer._
 
-/**
- * e.g. case class IntWrapper(i: Int), this is a structure class having an integer field, therefore the code will be generated as  
- * calls recurQuote, the type is matched to a structured type having only 1 accessorField.  The generated code will be:
- *
- * implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[IntWrapper] {
- *   override def format[J](obj: Any)(implicit builder: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
- *     val typedObj = obj.asInstanceOf[IntWrapper];
- *     builder.makeObject(
- *       "t" -> builder.makeString("IntWrapper"),
- *       "args" ->
- *       (
- *         if (typedObj.$eq$eq(null)) // from structuredTypeQuote()
- *           throw new IllegalArgumentException("The data object has a null attribute") // from structuredTypeQuote()
- *         else // from structuredTypeQuote()
- *           builder.makeObject({ // from structuredTypeQuote()
- *             val i = typedObj.i;  // from eachAccessorQuote()
- *             "i" -> builder.makeNumber(i.asInstanceOf[Double])  // from eachAccessorQuote() and then numericValQuote()
- *           })
- *       )
- *     )
- *   }
- * };
- * GenJsonFormatter
- */
 object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def jsonIo(c: Context): c.universe.TermName = c.universe.TermName("builder")
 
@@ -330,10 +307,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
   def formatterQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
       q"""
-      implicit object GenJsonFormatter extends au.com.fairfax.adonis.apws.macros.JsonFormatter[$tpe] {
-        import au.com.fairfax.adonis.apws.macros.JsonRegistry
+      implicit object GenJsonFormatter extends au.com.fairfax.pickler.macros.JsonFormatter[$tpe] {
+        import au.com.fairfax.pickler.macros.JsonRegistry
 
-        override def format[J](obj: Any)(nameOfFormattedField: String)(includeTpeInJson: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.adonis.apws.macros.JBuilder[J]) = {
+        override def format[J](obj: Any)(nameOfFormattedField: String)(includeTpeInJson: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.pickler.macros.JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
           val formattedField = ${matchObjTpeQuote(c)(tpe)("typedObj")("")}
           if (includeTpeInJson)

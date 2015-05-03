@@ -1,4 +1,4 @@
-package au.com.fairfax.adonis.apws.macros
+package au.com.fairfax.pickler.macros
 
 trait JBuilder[J] {
   def makeNull(): J

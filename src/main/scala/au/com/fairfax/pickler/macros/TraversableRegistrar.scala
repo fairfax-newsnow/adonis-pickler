@@ -1,9 +1,8 @@
-package au.com.fairfax.adonis.apws.macros
-
-import au.com.fairfax.adonis.apws.types.Enum
+package au.com.fairfax.pickler.macros
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
+import au.com.fairfax.pickler.types._
 
 /**
  * Singleton to keep track if the parser/formatter are already generated
@@ -54,7 +53,7 @@ object TraversableRegistrar {
 
   private def alreadyRegisteredQuote(c: Context)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
-    q"au.com.fairfax.adonis.apws.macros.RegistrarDoesNothing[$tpe]()"
+    q"au.com.fairfax.pickler.macros.RegistrarDoesNothing[$tpe]()"
   }
 
   private def parserFormatterQuote(c: Context)(tpe: c.universe.Type): (c.universe.Tree, c.universe.Tree) =
@@ -65,10 +64,10 @@ object TraversableRegistrar {
     val tpe = weakTypeOf[T]
 
     q"""
-      import au.com.fairfax.adonis.apws.macros.TraversableRegistrar
-      import au.com.fairfax.adonis.apws.macros.JsonRegistry
-      import au.com.fairfax.adonis.apws.macros.JsonParser
-      import au.com.fairfax.adonis.apws.macros.JsonFormatter
+      import au.com.fairfax.pickler.macros.TraversableRegistrar
+      import au.com.fairfax.pickler.macros.JsonRegistry
+      import au.com.fairfax.pickler.macros.JsonParser
+      import au.com.fairfax.pickler.macros.JsonFormatter
       
       implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe}] {
         val traversableRegister: List[(String, JsonParser[_], JsonFormatter[_])] =
