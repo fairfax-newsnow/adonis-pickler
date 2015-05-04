@@ -27,7 +27,6 @@ trait CaseEnum[T <: Enum] {
 
 trait Enum {
 
-  override lazy val toString = {
+  override lazy val toString = 
     simpleTypeNm(getClass.getName).toUpperCase.dropWhile(_ != '$').drop(1)
-  }
 }
