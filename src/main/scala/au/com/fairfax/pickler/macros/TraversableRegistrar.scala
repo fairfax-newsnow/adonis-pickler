@@ -29,7 +29,7 @@ object TraversableRegistrar {
   implicit def registerHelperMacros[T]: TraversableRegistrar[T] = macro materialize[T]
 
 
-  def materialize[T: c.universe.WeakTypeTag](c: Context): c.Expr[TraversableRegistrar[T]] = {
+  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[TraversableRegistrar[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
     val tpeStr = toMapKey(tpe.toString)
@@ -42,12 +42,6 @@ object TraversableRegistrar {
         yetToRegisterQuote[T](c)(tpeStr)
       }
 
-//    println(
-//      s"""
-//             |TraversableRegistrar.materialize[$tpe], result =
-//             |$result
-//           """.stripMargin)
-//    println(s"\n\n------------------------  stopping TraversableRegistrar: $tpe ---------------------------- t-length: ${result.toString.length}\n\n")
     c.Expr[TraversableRegistrar[T]](result)
   }
 
@@ -59,7 +53,7 @@ object TraversableRegistrar {
   private def parserFormatterQuote(c: Context)(tpe: c.universe.Type): (c.universe.Tree, c.universe.Tree) =
     (ParserMaterializerImpl.parserQuote(c)(tpe), FormatterMaterializerImpl.formatterQuote(c)(tpe))
 
-  private def yetToRegisterQuote[T: c.universe.WeakTypeTag](c: Context)(keyBeAdded: String) = {
+  private def yetToRegisterQuote[T: c.WeakTypeTag](c: Context)(keyBeAdded: String) = {
     import c.universe._
     val tpe = weakTypeOf[T]
 

@@ -25,11 +25,6 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   def jsonIo(c: Context): c.universe.TermName
 
   /**
-   * Qutoe of method definition that handle an Item
-   */
-//  def quoteOfHandleItemDef(c: Context)(itemTpe: c.universe.Type)(methodNm: c.universe.TermName): c.universe.Tree
-
-  /**
    * Quote to handle a map
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree
