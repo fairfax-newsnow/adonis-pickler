@@ -58,11 +58,8 @@ object TraversableRegistrar {
     val tpe = weakTypeOf[T]
 
     q"""
-      import au.com.fairfax.pickler.macros.TraversableRegistrar
-      import au.com.fairfax.pickler.macros.JsonRegistry
-      import au.com.fairfax.pickler.macros.JsonParser
-      import au.com.fairfax.pickler.macros.JsonFormatter
-      
+      import au.com.fairfax.pickler.macros.{TraversableRegistrar, JsonParser, JsonFormatter}
+
       implicit object GenTraversableRegistrar extends TraversableRegistrar[${tpe}] {
         val traversableRegister: List[(String, JsonParser[_], JsonFormatter[_])] =
           ${traverseQuote(c)(tpe)(keyBeAdded)}

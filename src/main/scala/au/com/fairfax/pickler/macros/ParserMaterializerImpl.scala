@@ -350,8 +350,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
     import c.universe._
       q"""
         implicit object GenJsonParser extends au.com.fairfax.pickler.macros.JsonParser[${tpe.dealias}] {
-          import au.com.fairfax.pickler.macros.JsonRegistry
-          import au.com.fairfax.pickler.macros.JReader
+          import au.com.fairfax.pickler.macros.{JsonRegistry, JReader}
 
           override def parse[J](json: J)(nameOfParsedField: String)(implicit ${jsonIo(c)}: JReader[J]) = {
             ${matchObjTpeQuote(c)(tpe.dealias)("json")(TermName("nameOfParsedField"))}

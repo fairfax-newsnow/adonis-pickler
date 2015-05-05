@@ -308,9 +308,9 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     import c.universe._
       q"""
       implicit object GenJsonFormatter extends au.com.fairfax.pickler.macros.JsonFormatter[$tpe] {
-        import au.com.fairfax.pickler.macros.JsonRegistry
+        import au.com.fairfax.pickler.macros.{JsonRegistry, JBuilder}
 
-        override def format[J](obj: Any)(nameOfFormattedField: String)(includeTpeInJson: Boolean)(implicit ${jsonIo(c)}: au.com.fairfax.pickler.macros.JBuilder[J]) = {
+        override def format[J](obj: Any)(nameOfFormattedField: String)(includeTpeInJson: Boolean)(implicit ${jsonIo(c)}: JBuilder[J]) = {
           val typedObj = obj.asInstanceOf[$tpe]
           val formattedField = ${matchObjTpeQuote(c)(tpe)("typedObj")("")}
           if (includeTpeInJson)
