@@ -139,7 +139,7 @@ object TraversableRegistrar {
       case caseObjTpe: Type if caseObjTpe.typeSymbol.isModuleClass =>
         q"List(($keyBeAdded, $parser, $formatter))"
 
-      // Any, AnyRef, non-sealed trait, abstract class, just class
+      // Any, AnyRef, non-sealed trait, abstract class
       case _ =>
         q"Nil"
     }
