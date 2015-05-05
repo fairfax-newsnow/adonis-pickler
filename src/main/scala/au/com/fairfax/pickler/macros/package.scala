@@ -35,6 +35,13 @@ package object macros {
       tpe.typeSymbol.asClass.isCaseClass &&
         !tpe.typeSymbol.isModuleClass
 
+  /*
+   * A primitive type, such as classOf[Float].getName != typeOf[Float].getName.  But the type of a 
+   * data type, i.e. "Float" is used as the key to its corresponding formatter/parser in the JsonRegistry, 
+   * therefore strConversion is defined to convert a primitive type class name to the corresponding type name 
+   * to find out the key in the JsonRegistry.
+   * strConversion is Map(float -> Float, short -> Short, double -> Double, long -> Long, boolean -> Boolean, int -> Int, java.lang.String -> String)
+   */
   private lazy val strConversion: String Map String =
     (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
       s => s -> s.capitalize
