@@ -1,5 +1,6 @@
 package au.com.fairfax.pickler.macros
 
+import au.com.fairfax.pickler.simpleTypeNm
 import scala.collection.mutable.{HashMap => MHashMap}
 import scala.language.existentials
 import scala.language.experimental.macros
@@ -58,17 +59,22 @@ class BaseJsonRegistry extends JsonRegistry {
    * using a TypeKeyProvider.  Using TypeKeyProvider needs macro which results in high memory usage  
    */
   def internalFormat[J](obj: Any, nameOfFormattedField: String, includeTpeInJson: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J = {
+    // objClassName is needed in case typeKey is Any or non-sealed trait
     lazy val objClassName = {
       val className = obj.getClass.getName.replace('$', '.')
       if (className endsWith ".") className + "type" // this a case object, key should be ended with ".type"
       else className
     }
+    // if objClassName doesn't work, then this objClassName might be a primitive data type class,
+    // i.e. java.lang.Float, java.lang.Short, ...
+    lazy val primitiveType = simpleTypeNm(objClassName)
     
     formatters.get(typeKey).fold {
-      // typeKey is probably Any or non-sealed trait, therefore objClassName is used
       formatters.get(objClassName).fold {
-        throw new Error(s"No formatter exists for $typeKey or $objClassName derived from object of class name ${obj.getClass}.replace('$$', '.')")
-      }(_.format(obj)("v")(true)) // includeTpeInJson is true, o.w. the parser won't known which concrete class to parse
+        formatters.get(primitiveType).fold {
+          throw new Error(s"No formatter exists for $typeKey or $objClassName derived from object of class name ${obj.getClass}.replace('$$', '.') or $primitiveType")
+        }(_.format(obj)("v")(true))
+      }(_.format(obj)("v")(true)) // includeTpeInJson should be true, o.w. the parser won't known which concrete class to parse
     }(_.format(obj)(nameOfFormattedField)(includeTpeInJson))
   }
 

@@ -89,6 +89,57 @@ case class AlgoWrapper(learning: Algorithm.Learning)
 
 case class RegressionWrapper(classification: Regression.Classification)
 
+// data types for test case "have List[TraversableCollection] formatted/parsed successfully to test TraversableRegistrar on pattern match collection type"
+case class TraversableCollection(s: String)
+
+// data types for test case "have Map[TraversableKey, TraversableValue] formatted/parsed successfully to test TraversableRegistrar on pattern match map type"
+case class TraversableKey(i: Int)
+case class TraversableValue(s: String)
+
+// data types for test case "have structure whose # of fields not the same as old json but still formatted/parsed successfully"
+case class Sample1(m: String)
+case class Sample2(m: Option[String])
+case class Sample3(m: Option[String], n: Option[String])
+case class Sample4(m: String, n: Option[String])
+
+// data types for test case "have TraversableStructure formatted/parsed successfully to test TraversableRegistrar on pattern match structured type"
+case class TraversableChild1(s1: String)
+case class TraversableChild2(s2: String)
+case class TraversableStructure(c1: TraversableChild1, c2: TraversableChild2)
+
+// data types for test case "have TraversableTrait formatted/parsed successfully to test TraversableRegistrar on pattern match trait type"
+sealed trait TraversableTrait
+case class TraversableCaseClass1(s1: String) extends TraversableTrait
+case class TraversableCaseClass2(s2: String) extends TraversableTrait
+
+// data types for test case "have Option[TraversableOption] formatted/parsed successfully to test TraversableRegistrar on pattern match option type"
+case class TraversableOption(s: String)
+
+// data types for test case "have case object empty case class (registered) formatted/parse successfully"
+case object CaseObject
+case class CaseClass()
+
+// data types for test case "have hybrid case object empty case class formatted/parsed successfully"
+sealed trait HybridTrait1
+case class HybridCaseObject11() extends HybridTrait1
+case object HybridCaseObject12 extends HybridTrait1
+sealed trait HybridTrait2
+case class HybridCaseObject21() extends HybridTrait2
+case object HybridCaseObject22 extends HybridTrait2
+case class HybridClass(s: String) extends HybridTrait2
+
+// data types for test case "have Either[TraversableLeft, TraversableRight] formatted/parsed successfully to test TraversableRegistrar on pattern match either type"
+case class TraversableLeft(l: String)
+case class TraversableRight(r: String)
+
+// data types for test case "have case class having a Any, AnyRef, non-sealed trait, abstract class formatted/parsed successfully"
+trait NonSealedTrait
+case class NonSealedTraitChild1(i: Int) extends NonSealedTrait
+abstract class AbstractClass
+case class AbstractClassChild1(s: String) extends AbstractClass
+case class AbstractClassChild2(s: String) extends AbstractClass
+case class WrapperOfAny(obj1: Any, obj2: AnyRef, obj3: NonSealedTrait, obj4: AbstractClass)
+
 class JsonRegistrySpec extends FlatSpec with Matchers {
 
   registerTypes()
@@ -99,7 +150,7 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     formatted should be(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.AlgoWrapper","args":{"learning":"SUPERVISED"}}"""))
     parse(formatted) should be(algo)
   }
-  
+
   it should "have RegressionWrapper containing Regression.Classification enum objects formatted/parsed successfully" in {
     val reg = RegressionWrapper(Regression.Logistic())
     val formatted = format(reg)
@@ -243,8 +294,6 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have Either[TraversableLeft, TraversableRight] formatted/parsed successfully to test TraversableRegistrar on pattern match either type" in {
-    case class TraversableLeft(l: String)
-    case class TraversableRight(r: String)
     register[Either[TraversableLeft, TraversableRight]]
 
     val left = TraversableLeft("democrat")
@@ -275,14 +324,11 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have hybrid case object empty case class formatted/parsed successfully" in {
-    sealed trait HybridTrait1
-    case class HybridCaseObject11() extends HybridTrait1
-    case object HybridCaseObject12 extends HybridTrait1
     register[HybridTrait1]
 
     var hybridTrait1: HybridTrait1 = new HybridCaseObject11
     var formatted = format(hybridTrait1)
-    var jsonStr = """{"t":"HybridTrait1","args":{"t":"HybridCaseObject11","v":""}}"""
+    var jsonStr = """{"t":"au.com.fairfax.pickler.macros.HybridTrait1","args":{"t":"HybridCaseObject11","v":""}}"""
     formatted should be(PlayJson.parse(jsonStr))
     parse(formatted) should be(hybridTrait1)
 
@@ -295,15 +341,11 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     parse(format(HybridCaseObject12)) should be(HybridCaseObject12)
     parse(format(new HybridCaseObject11)) should be(new HybridCaseObject11)
 
-    sealed trait HybridTrait2
-    case class HybridCaseObject21() extends HybridTrait2
-    case object HybridCaseObject22 extends HybridTrait2
-    case class HybridClass(s: String) extends HybridTrait2
     register[HybridTrait2]
 
     var hybridTrait2: HybridTrait2 = new HybridCaseObject21
     formatted = format(hybridTrait2)
-    jsonStr = """{"t":"HybridTrait2","args":{"t":"HybridCaseObject21","v":""}}"""
+    jsonStr = """{"t":"au.com.fairfax.pickler.macros.HybridTrait2","args":{"t":"HybridCaseObject21","v":""}}"""
     formatted should be(PlayJson.parse(jsonStr))
     parse(formatted) should be(hybridTrait2)
 
@@ -401,12 +443,10 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have case object empty case class (registered) formatted/parse successfully" in {
-    case object CaseObject
-    case class CaseClass()
     register[CaseObject.type]
     register[CaseClass]
 
-    val jsonStr = s"""{"t":"CaseObject.type","args":""}"""
+    val jsonStr = s"""{"t":"au.com.fairfax.pickler.macros.CaseObject.type","args":""}"""
     format(CaseObject) should be(PlayJson.parse(jsonStr))
     parse(format(CaseObject)) should be(CaseObject)
 
@@ -416,7 +456,6 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have Option[TraversableOption] formatted/parsed successfully to test TraversableRegistrar on pattern match option type" in {
-    case class TraversableOption(s: String)
     register[Option[TraversableOption]]
 
     var opt: Option[TraversableOption] = Some(TraversableOption("abc"))
@@ -428,9 +467,6 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have TraversableTrait formatted/parsed successfully to test TraversableRegistrar on pattern match trait type" in {
-    sealed trait TraversableTrait
-    case class TraversableCaseClass1(s1: String) extends TraversableTrait
-    case class TraversableCaseClass2(s2: String) extends TraversableTrait
     register[TraversableTrait]
 
     val t1 = TraversableCaseClass1("s1")
@@ -441,9 +477,6 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have TraversableStructure formatted/parsed successfully to test TraversableRegistrar on pattern match structured type" in {
-    case class TraversableChild1(s1: String)
-    case class TraversableChild2(s2: String)
-    case class TraversableStructure(c1: TraversableChild1, c2: TraversableChild2)
     register[TraversableStructure]
 
     val c1 = TraversableChild1("child1")
@@ -457,23 +490,20 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
 
   it should "have structure whose # of fields not the same as old json but still formatted/parsed successfully" in {
     // json data has more field than data object
-    case class Sample1(m: String)
     register[Sample1]
-    parse(PlayJson.parse( """{"t":"Sample1","args":{"m":"hay","n":"haha"}}""")) should be {
+    parse(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.Sample1","args":{"m":"hay","n":"haha"}}""")) should be {
       Sample1("hay")
     }
 
     // json data has more field than data object, and the data object field is Option
-    case class Sample2(m: Option[String])
     register[Sample2]
-    parse(PlayJson.parse( """{"t":"Sample2","args":{"m":"hay","n":"haha"}}""")) should be {
+    parse(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.Sample2","args":{"m":"hay","n":"haha"}}""")) should be {
       Sample2(Some("hay"))
     }
 
     // json data has fewer fields than data object
-    case class Sample3(m: Option[String], n: Option[String])
     register[Sample3]
-    parse(PlayJson.parse( """{"t":"Sample3","args":{"n":"hay"}}""")) should be {
+    parse(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.Sample3","args":{"n":"hay"}}""")) should be {
       Sample3(None, Some("hay"))
     }
 
@@ -481,17 +511,16 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     register[List[Sample1]]
     parse(PlayJson.parse(
       """
-        |{"t":"List[Sample1]","args":[{"m":"hay","n":"haha"},{"m":"hay1","n":"haha1"}]}
+        |{"t":"List[au.com.fairfax.pickler.macros.Sample1]","args":[{"m":"hay","n":"haha"},{"m":"hay1","n":"haha1"}]}
         | """.stripMargin)) should be {
       List(Sample1("hay"), Sample1("hay1"))
     }
 
     // object has more fields than its json counterpart is enclosed by List
-    case class Sample4(m: String, n: Option[String])
     register[List[Sample4]]
     parse(PlayJson.parse(
       """
-        |{"t":"List[Sample4]","args":[{"m":"hay"},{"m":"hay1"}]}
+        |{"t":"List[au.com.fairfax.pickler.macros.Sample4]","args":[{"m":"hay"},{"m":"hay1"}]}
         | """.stripMargin)) should be {
       List(Sample4("hay", None), Sample4("hay1", None))
     }
@@ -499,15 +528,13 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     // object has same # of fields but its json counterpart has some null value
     parse(PlayJson.parse(
       """
-        |{"t":"List[Sample4]","args":[{"m":"hay","n":"haha1"},{"m":"hay1","n":null}]}
+        |{"t":"List[au.com.fairfax.pickler.macros.Sample4]","args":[{"m":"hay","n":"haha1"},{"m":"hay1","n":null}]}
         | """.stripMargin)) should be {
       List(Sample4("hay", Some("haha1")), Sample4("hay1", None))
     }
   }
 
   it should "have Map[TraversableKey, TraversableValue] formatted/parsed successfully to test TraversableRegistrar on pattern match map type" in {
-    case class TraversableKey(i: Int)
-    case class TraversableValue(s: String)
     register[TraversableKey Map TraversableValue]
 
     val k = TraversableKey(1)
@@ -530,13 +557,22 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
   }
 
   it should "have List[TraversableCollection] formatted/parsed successfully to test TraversableRegistrar on pattern match collection type" in {
-    case class TraversableCollection(s: String)
     register[List[TraversableCollection]]
 
     val list = List(TraversableCollection("a"), TraversableCollection("b"))
     parse(format(list)) should be(list)
 
     parse(format(list.head)) should be(list.head)
+  }
+
+
+  it should "have case class having a Any, AnyRef, non-sealed trait, abstract class formatted/parsed successfully" in {
+    register[WrapperOfAny]
+    register[NonSealedTraitChild1]
+    register[AbstractClassChild1]
+    
+    val wrapper = WrapperOfAny(123L, "String", NonSealedTraitChild1(123), AbstractClassChild1("abc"))
+    println(format(wrapper))
   }
 
   def registerTypes() = {
