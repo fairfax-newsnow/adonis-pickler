@@ -326,8 +326,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
       """
   }
 
-  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
-    import c.universe._
-    c.Expr[JsonFormatter[T]](formatterQuote(c)(weakTypeOf[T]))
-  }
+  // this method is not needed because implicit materializer macro happens
+  // on TraversableRegistrar which calls formatterQuote() on this object
+//  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonFormatter[T]] = {
+//    import c.universe._
+//    c.Expr[JsonFormatter[T]](formatterQuote(c)(weakTypeOf[T]))
+//  }
 }

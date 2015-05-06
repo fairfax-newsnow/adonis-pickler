@@ -47,7 +47,7 @@ package object macros {
    * A number of java.lang.XXX -> XXX is needed because, e.g. Sample(a: Any), if a is integer,
    * JsonRegistry.internalFormat will find its runtime to be java.lang.Integer
    */
-  lazy val strConversion: String Map String =
+  private lazy val strConversion: String Map String =
     (
       className[java.lang.Integer] -> className[Int].capitalize ::
       List(className[java.lang.Float], className[java.lang.Short], className[java.lang.Double], className[java.lang.Long], className[java.lang.Boolean], className[String]).map{

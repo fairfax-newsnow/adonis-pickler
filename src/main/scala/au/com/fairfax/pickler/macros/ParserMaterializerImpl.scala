@@ -365,8 +365,10 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
-  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
-    import c.universe._
-    c.Expr[JsonParser[T]](parserQuote(c)(weakTypeOf[T]))
-  }
+  // this method is not needed because implicit materializer macro happens 
+  // on TraversableRegistrar which calls parserQuote() on this object
+//  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
+//    import c.universe._
+//    c.Expr[JsonParser[T]](parserQuote(c)(weakTypeOf[T]))
+//  }
 }

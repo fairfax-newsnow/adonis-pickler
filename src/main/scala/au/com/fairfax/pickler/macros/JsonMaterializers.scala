@@ -216,10 +216,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
   
 }
 
-trait ParserMaterializer {
-  implicit def jsonParserMacro[T]: JsonParser[T] = macro ParserMaterializerImpl.materialize[T]
-}
-
-trait FormatterMaterializer {
-  implicit def jsonFormatterMacro[T]: JsonFormatter[T] = macro FormatterMaterializerImpl.materialize[T]
-}
+//trait ParserMaterializer {
+//  implicit def jsonParserMacro[T]: JsonParser[T] = macro ParserMaterializerImpl.materialize[T]
+//}
+//
+//trait FormatterMaterializer {
+//  implicit def jsonFormatterMacro[T]: JsonFormatter[T] = macro FormatterMaterializerImpl.materialize[T]
+//}
