@@ -35,25 +35,34 @@ package object macros {
       tpe.typeSymbol.asClass.isCaseClass &&
         !tpe.typeSymbol.isModuleClass
 
+  private val name2SimpleTypeName: String => (String, String) = s => s -> simpleTypeNm(s)
   /*
    * A primitive type, such as classOf[Float].getName != typeOf[Float].getName.  But the type of a 
    * data type, i.e. "Float" is used as the key to its corresponding formatter/parser in the JsonRegistry, 
    * therefore strConversion is defined to convert a primitive type class name to the corresponding type name 
    * to find out the key in the JsonRegistry.
-   * strConversion is Map(float -> Float, short -> Short, double -> Double, long -> Long, boolean -> Boolean, int -> Int, java.lang.String -> String)
+   * strConversion is
+   * Map(java.lang.Boolean -> Boolean, java.lang.Float -> Float, float -> Float, short -> Short, java.lang.Integer -> Int, java.lang.Double -> Double, double -> Double, 
+   * long -> Long, boolean -> Boolean, java.lang.Long -> Long, int -> Int, java.lang.Short -> Short, java.lang.String -> String)
+   * A number of java.lang.XXX -> XXX is needed because, e.g. Sample(a: Any), if a is integer,
+   * JsonRegistry.internalFormat will find its runtime to be java.lang.Integer
    */
-  private lazy val strConversion: String Map String =
-    (List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
-      s => s -> s.capitalize
-    } ::: List(className[String]).map{
-      s => s -> simpleTypeNm(s)
-    }).toMap
+  lazy val strConversion: String Map String =
+    (
+      className[java.lang.Integer] -> className[Int].capitalize ::
+      List(className[java.lang.Float], className[java.lang.Short], className[java.lang.Double], className[java.lang.Long], className[java.lang.Boolean], className[String]).map{
+        name2SimpleTypeName
+      } :::
+      List(className[Short], className[Int], className[Long], className[Double], className[Float], className[Boolean]).map {
+        s => s -> s.capitalize
+      }
+    ).toMap
   
   lazy val strReplacement: String Map String =
-    List(className[Map[_, _]]).map {
-      s => s -> simpleTypeNm(s)
-    }.toMap
-
+    Map(
+      name2SimpleTypeName(className[Map[_, _]])
+    )
+      
   def className[T: ClassTag] = implicitly[ClassTag[T]].runtimeClass.getName
 
   def toMapKey(s: String): String =

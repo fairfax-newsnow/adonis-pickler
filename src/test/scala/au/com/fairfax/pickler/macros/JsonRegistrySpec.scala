@@ -571,8 +571,51 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     register[NonSealedTraitChild1]
     register[AbstractClassChild1]
     
-    val wrapper = WrapperOfAny(123L, "String", NonSealedTraitChild1(123), AbstractClassChild1("abc"))
-    println(format(wrapper))
+    var wrapper = WrapperOfAny(123, "String", NonSealedTraitChild1(123), AbstractClassChild1("abc"))
+    var formatted = format(wrapper)
+    formatted should be(PlayJson.parse(
+      """{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Int","v":123.0},"obj2":{"t":"String","v":"String"},"obj3":{"t":"au.com.fairfax.pickler.macros.NonSealedTraitChild1","v":{"i":123.0}},"obj4":{"t":"au.com.fairfax.pickler.macros.AbstractClassChild1","v":{"s":"abc"}}}}"""
+    ))
+    parse(formatted) should be(wrapper)
+    
+    wrapper = wrapper.copy(obj1 = 1.2f)
+    formatted = format(wrapper)
+    formatted.toString.contains("""{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Float","v":""") should be(true)
+    parse(formatted) should be(wrapper)
+    
+    val sh: Short = 123
+    wrapper = wrapper.copy(obj1 = sh)
+    formatted = format(wrapper)
+    formatted should be(PlayJson.parse(
+      """{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Short","v":123.0},"obj2":{"t":"String","v":"String"},"obj3":{"t":"au.com.fairfax.pickler.macros.NonSealedTraitChild1","v":{"i":123.0}},"obj4":{"t":"au.com.fairfax.pickler.macros.AbstractClassChild1","v":{"s":"abc"}}}}"""
+    ))
+    parse(formatted) should be(wrapper)
+
+    wrapper = wrapper.copy(obj1 = 1.20)
+    formatted = format(wrapper)
+    formatted.toString.contains("""{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Double","v":""") should be(true)
+    parse(formatted) should be(wrapper)
+    
+    wrapper = wrapper.copy(123L)
+    formatted = format(wrapper)
+    formatted should be(PlayJson.parse(
+      """{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Long","v":123.0},"obj2":{"t":"String","v":"String"},"obj3":{"t":"au.com.fairfax.pickler.macros.NonSealedTraitChild1","v":{"i":123.0}},"obj4":{"t":"au.com.fairfax.pickler.macros.AbstractClassChild1","v":{"s":"abc"}}}}"""
+    ))
+    parse(formatted) should be(wrapper)
+
+    wrapper = wrapper.copy(true)
+    formatted = format(wrapper)
+    formatted should be(PlayJson.parse(
+      """{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"Boolean","v":true},"obj2":{"t":"String","v":"String"},"obj3":{"t":"au.com.fairfax.pickler.macros.NonSealedTraitChild1","v":{"i":123.0}},"obj4":{"t":"au.com.fairfax.pickler.macros.AbstractClassChild1","v":{"s":"abc"}}}}"""
+    ))
+    parse(formatted) should be(wrapper)
+
+    wrapper = wrapper.copy("trustno1")
+    formatted = format(wrapper)
+    formatted should be(PlayJson.parse(
+      """{"t":"au.com.fairfax.pickler.macros.WrapperOfAny","args":{"obj1":{"t":"String","v":"trustno1"},"obj2":{"t":"String","v":"String"},"obj3":{"t":"au.com.fairfax.pickler.macros.NonSealedTraitChild1","v":{"i":123.0}},"obj4":{"t":"au.com.fairfax.pickler.macros.AbstractClassChild1","v":{"s":"abc"}}}}"""
+    ))
+    parse(formatted) should be(wrapper)
   }
 
   def registerTypes() = {

@@ -67,7 +67,7 @@ class BaseJsonRegistry extends JsonRegistry {
     }
     // if objClassName doesn't work, then this objClassName might be a primitive data type class,
     // i.e. java.lang.Float, java.lang.Short, ...
-    lazy val primitiveType = simpleTypeNm(objClassName)
+    lazy val primitiveType = toMapKey(objClassName)
     
     formatters.get(typeKey).fold {
       formatters.get(objClassName).fold {
