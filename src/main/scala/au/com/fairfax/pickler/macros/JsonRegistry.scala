@@ -55,7 +55,8 @@ class BaseJsonRegistry extends JsonRegistry {
   }
 
   /**
-   * A function that should be called by a generated formatter only, the reason is the the formatter can provide the typeKey information without 
+   * A function that should be called by a generated formatter only, please check the quasiquote 
+   * inside FormatterMaterializerImpl, the reason is the the formatter can provide the typeKey information without
    * using a TypeKeyProvider.  Using TypeKeyProvider needs macro which results in high memory usage  
    */
   def internalFormat[J](obj: Any, nameOfFormattedField: String, includeTpeInJson: Boolean, typeKey: String)(implicit builder: JBuilder[J]): J = {
