@@ -201,4 +201,19 @@ java.lang.Error: No formatter exists for Any or java.lang.Long derived from obje
   at au.com.fairfax.pickler.macros.BaseJsonRegistry.format(JsonRegistry.scala:54)
   ... 43 elided
 ```
-It fails in the second `format` because the pickler find the runtime class of the first attribute is `Long` but it has not `register[Long]`
+It fails in the second `format` because the pickler detects the runtime class of the first attribute is `Long` but it has not `register[Long]`
+
+##How to use the pickler
+As showed in the previous section, using the pickler is pretty straight forward - calls the code generation of parser/formatter of a specific type by `register[RquiredType]`.
+* Register a type that has been registered before will not generate the code again.
+* The order of registering types does not matter.
+* It is good habit to register all the required data types by calling `register[RequiredType]` inside a specific object.
+
+Please refer to https://github.com/fairfax-newsnow/adonis-pickler/blob/master/src/test/scala/au/com/fairfax/pickler/macros/JsonRegistrySpec.scala as reference.
+##Application structure
+###JsonRegistry
+###TraversableRegistrar
+###ParserMaterializerImpl
+###FormatterMaterializerImpl
+###JReader
+###JBuilder
