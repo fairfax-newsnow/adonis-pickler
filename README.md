@@ -13,6 +13,8 @@ Adonis pickler is a library that serializes Scala object to Json format and vice
 * self-defined enum object which is an attribute inside a case class
 * Limited support for an attribute of Any type inside a case class
 
+This pickler is using implicit materializer macro.  http://docs.scala-lang.org/overviews/macros/implicits.html
+
 ##Json format
 Adonis pickler is designed to provide just enough information in the Json data to minimize the overhead while enable it to be de-serialized to Scala object.
 Let's have a quick look on the various Json formats of some sample Scala data by running the following command under the folder `adonis-pickler`
@@ -204,16 +206,28 @@ java.lang.Error: No formatter exists for Any or java.lang.Long derived from obje
 It fails in the second `format` because the pickler detects the runtime class of the first attribute is `Long` but it has not `register[Long]`
 
 ##How to use the pickler
-As showed in the previous section, using the pickler is pretty straight forward - calls the code generation of parser/formatter of a specific type by `register[RquiredType]`.
+As showed in the previous section, using the pickler is pretty straight forward - calls the code generation of parser/formatter of a specific type by `register[SpecificScalaDataType]`.
 * Register a type that has been registered before will not generate the code again.
 * The order of registering types does not matter.
-* It is good habit to register all the required data types by calling `register[RequiredType]` inside a specific object.
+* It is good habit to register all the required data types by calling `register[SpecificScalaDataType]` inside a specific object.
 
 Please refer to https://github.com/fairfax-newsnow/adonis-pickler/blob/master/src/test/scala/au/com/fairfax/pickler/macros/JsonRegistrySpec.scala as reference.
 ##Application structure
-###JsonRegistry
-###TraversableRegistrar
-###ParserMaterializerImpl
-###FormatterMaterializerImpl
 ###JReader
+A trait that reads the attributes from the Json data.  There are different implementation APIs for reading the Json such as PlayJson, ScalaJs and so on.  Therefore the type of the Json data type is parametrized as generic.  It is used by `JsonParser[SpecificScalaDataType]` implementation.
+###ParserMaterializerImpl
+A materializer macro responsible for generating the code that implements `JsonParser[SpecificScalaDataType]` for data type `SpecificScalaDataType`
 ###JBuilder
+Similar to `JReader`.  This trait builds up the attribute values for the Json data.  It is used by `JsonFormatter[SpecificScalaDataType]` implementation.
+###FormatterMaterializerImpl
+A materializer macro responsible for generating the code that implements `JsonFormatter[SpecificScalaDataType]` for data type `SpecificScalaDataType`
+###Materializer
+A trait that defines the common skeleton for both `ParserMaterializerImpl` and `FormatterMaterializerImpl`
+###JsonRegistry
+It is the entry class that a pickler client interacts with.  It provides the following methods for a pickler client.
+* `register`
+* `format`
+* `parse`
+
+###TraversableRegistrar
+###TypeKeyProvider
