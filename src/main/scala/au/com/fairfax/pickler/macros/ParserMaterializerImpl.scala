@@ -277,19 +277,23 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * reader.readString(objNm) match {
    *   case "CaseObject1" => handle_CaseObject1
    *   case "CaseObject2" => handle_CaseObject2
+   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")    
    *   ...
    * }
    * o.w.
    * reader.readString(reader.readObjectField(objNm, "t")) match {
    *  case "CaseObject1" => handle_CaseObject1
    *  case "CaseClass2" => handle_CaseClass2(reader.readObjectField(objNm, "v"))
+   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")    
    * }
    */
   def ptnMatchQuoteForTraitFamily(c: Context)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
+      val unknownMsgMatchQuote = 
+        cq"""x: String => throw new IllegalArgumentException("Invalid value " + x + ", there is no such child class of the sealed trait, check code of this parser and its formatter")"""
       q"""
         ${jsonIo(c)}.readString(${jsonIo(c)}.readObjectField($objNm, "t")) match {
-          case ..$patternToHandlerQuotes
+          case ..${(unknownMsgMatchQuote :: patternToHandlerQuotes.toList).reverse}
         }
       """
   }

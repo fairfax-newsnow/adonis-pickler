@@ -258,9 +258,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    */
   def ptnMatchQuoteForTraitFamily(c: Context)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
+    val unknownMsgMatchQuote =
+      cq"""x => throw new IllegalArgumentException("Invalid object " + x + ", its type is not a child class of the sealed trait, check code of the trait's family")"""
     q"""
       $objNm match {
-        case ..$patternToHandlerQuotes
+        case ..${(unknownMsgMatchQuote :: patternToHandlerQuotes.toList).reverse}
       }
     """
   }
