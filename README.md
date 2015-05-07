@@ -13,7 +13,7 @@ Adonis pickler is a library that serializes Scala object to Json format and vice
 * self-defined enum object which is an attribute inside a case class
 * Limited support for an attribute of Any type inside a case class
 
-This pickler is using implicit materializer macro.  http://docs.scala-lang.org/overviews/macros/implicits.html
+This pickler can also be compiled to a js library using ScalaJs such that it can be used by js applications executed in a browsers.  Implicit materializer macro is used in writing this pickler.  You are assumed to have basic understanding of Scala macros and the implicit materializer macro.  Please refer to http://docs.scala-lang.org/overviews/macros/implicits.html for more information.
 
 ##Json format
 Adonis pickler is designed to provide just enough information in the Json data to minimize the overhead while enable it to be de-serialized to Scala object.
@@ -224,10 +224,36 @@ A materializer macro responsible for generating the code that implements `JsonFo
 ###Materializer
 A trait that defines the common skeleton for both `ParserMaterializerImpl` and `FormatterMaterializerImpl`
 ###JsonRegistry
-It is the entry class that a pickler client interacts with.  It provides the following methods for a pickler client.
+It is the entry class that a pickler client interacts with and maintains a registry for all the generated parsers/formatters.  It provides the following methods for a pickler client.
 * `register`
 * `format`
 * `parse`
 
+###ParserFormatterTracker
+A singleton that keeps track of which Scala data type's parser/formatter have been generated during Scala code compilation.
 ###TraversableRegistrar
+It is the class where materializer macro is triggered to generate the code.  Its client is `JsonRegistry`.  When `JsonRegistry.register[SpecificDataType]` is called, it will implicitly load `TraversableRegistrar[SpecificDataType]` implementation whose code is generated as follows.
+* Checks from `ParserFormatterTracker` if `SpecificDataType`'s parser/formatter have been generated before.  If no, it will call `ParserMaterializerImpl.parserQuote` and `FormatterMaterializerImpl.formatterQuote`.
+* Checks all the data types which are directly or indirectly related to `SpecificDataType`.  For each related data type, checks from `ParserFormatterTracker` if the data type's parser/formatter have been generated before and generate the code if necessary.
+
+```Scala
+scala> case class Sample(i: String)
+defined class Sample
+
+scala> register[List[Sample]]
+
+scala> register[Int Map Double]
+
+scala> format("abc")
+res2: play.api.libs.json.JsValue = {"t":"String","args":"abc"}
+
+scala> format(0.2)
+res3: play.api.libs.json.JsValue = {"t":"Double","args":0.2}
+```
+* `register[List[Sample]]` generates parsers/formatters of `List[Sample]`, `Sample` and `String`.
+* `register[Int Map Double]` generates parsers/formatters of `Int Map Double`, `Int` and `Double`.
+* `format("abc")` does not need to `register[String]` beforehand because `String` parser/formater has been generated in `register[List[Sample]]`.
+* Similar theory applies to `format(0.2)`.
+
 ###TypeKeyProvider
+In formatting a Scala data object such as `format("abc")`, it needs to check the compile type of `"abc"` which is `String` to look up the corresponding formatter from `JsonRegistry`.  The type can be found by simply using `TypeTag`.  However, the ScalaJs library for the time being does not support `TypeTag`.  `TypeKeyProvider` is a workaround for generating code that provides the type information.
