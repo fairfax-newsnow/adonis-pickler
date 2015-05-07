@@ -257,3 +257,7 @@ res3: play.api.libs.json.JsValue = {"t":"Double","args":0.2}
 
 ###TypeKeyProvider
 In formatting a Scala data object such as `format("abc")`, it needs to check the compile type of `"abc"` which is `String` to look up the corresponding formatter from `JsonRegistry`.  The type can be found by simply using `TypeTag`.  However, the ScalaJs library for the time being does not support `TypeTag`.  `TypeKeyProvider` is a workaround for generating code that provides the type information.
+##Important note on using macros
+Things observed in using macros.
+* Code generation is done by calling `macro` a quasiquote.  The quasiquote should avoid calling another `macro` which may result in high memory usage.
+* Multi projects should be setup.  That is, the client code that uses the generated code should be put in a separate project from the generated code and its manipulated data object.  The client project should be set to depend on the projects of the quasiquotes and those data objects manipulated by the quasiquotes.  This ensures that code generation is complete before being used by the client project.
