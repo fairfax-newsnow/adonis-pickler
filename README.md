@@ -113,7 +113,7 @@ res21: play.api.libs.json.JsValue = {"t":"SealedTrait","args":{"t":"CaseClass1",
 scala> 
 ```
 ###Case object
-Sometimes a case object will be formatted directly rather than via a sealed trait.
+Sometimes a case object is formatted directly rather than via a sealed trait.
 ```Scala
 scala> case object CaseObject
 defined object CaseObject
