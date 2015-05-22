@@ -1,5 +1,5 @@
 #Adonis pickler
-Adonis pickler is a library that serializes Scala object to Json format and vice versa (aka de-serialization).  It is designed for the Fairfax's project and cope with the following data types:
+Adonis pickler is a library that serialises Scala objects to Json format and vice versa (aka de-serialisation).  It is designed to cope with the following data types:
 * primitive types, i.e. float, short, double, boolean, int, string
 * collection
 * map
@@ -13,11 +13,12 @@ Adonis pickler is a library that serializes Scala object to Json format and vice
 * self-defined enum object which is an attribute inside a case class
 * Limited support for an attribute of Any type inside a case class
 
-This pickler can also be compiled to a js library using ScalaJs such that it can be used by js applications executed in a browsers.  Implicit materializer macro is used in writing this pickler.  You are assumed to have basic understanding of Scala macros and the implicit materializer macro.  Please refer to http://docs.scala-lang.org/overviews/macros/implicits.html for more information.
+This pickler can also be compiled to a js library using ScalaJs such that it can be used by js applications executed in browsers. Implicit materializer macro is used in writing this pickler.  You are assumed to have basic understanding of Scala macros and the implicit materializer macro.  Please refer to http://docs.scala-lang.org/overviews/macros/implicits.html for more information.
 
 ##Json format
 Adonis pickler is designed to provide just enough information in the Json data to minimize the overhead and meanwhile enable it to be de-serialized to Scala object.
-Let's have a quick look on the various Json formats of some sample Scala data by running the following command under the folder `adonis-pickler`
+
+Below are some examples of support Scala datatypes and their Json output:
 ```scala
 sbt
 >test:console
