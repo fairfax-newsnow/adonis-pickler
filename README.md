@@ -18,7 +18,7 @@ This pickler can also be compiled to a js library using ScalaJs such that it can
 ##Json format
 Adonis pickler is designed to provide just enough information in the Json data to minimize the overhead and meanwhile enable it to be de-serialized to Scala object.
 
-Below are some examples of support Scala datatypes and their Json output:
+Below are some examples of supported Scala datatypes serialised as Json:
 ```scala
 sbt
 >test:console
