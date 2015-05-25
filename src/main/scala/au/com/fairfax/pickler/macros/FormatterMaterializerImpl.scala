@@ -10,7 +10,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format a map, it will be something like
-   * 
+   *
+   * {{{
    * def formatMap(map: K Map V) = 
    *   if (map == null)
    *     throw new IllegalArgumentException("The data object has a null attribute")
@@ -25,6 +26,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *     builder.makeArray(elems: _*)    
    *   }   
    * formatMap(objNm)
+   * }}}
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -51,7 +53,8 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format a collection, it will be something like
-   *  
+   *
+   * {{{
    * def formatCollection(itemList: Seq[ITEM]) <- not necessarily Seq but any collection type 
    *   if (itemList == null)
    *     throw new IllegalArgumentException("The data object has a null attribute")
@@ -62,6 +65,7 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
    *     builder.makeArray(jsonList: _*)     
    *   }   
    * formatCollection(objNm)
+   * }}}
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
@@ -82,12 +86,15 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format an option, it will be something like
+   *
+   * {{{
    * def formatOption(opt: Option[ITEM]) = 
    *   opt match {
    *     case Some(v) => JsonRegistry.internalFormat(v, "", false, item's type)
    *     case None => builder.makeNull()     
    *   }   
    * formatOption(objNm)
+   * }}}
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -107,12 +114,14 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format an either, it will be something like
+   * {{{
    * def formatEither(either: Either[LEFT, RIGHT]) = 
    *   either match {
    *     case Left(v) => JsonRegistry.internalFormat(v, "v", true, left item's type)
    *     case Right(v) => JsonRegistry.internalFormat(v, "v", true, right item's type)     
    *   }   
    * formatEither(objNm)
+   * }}}
    */
   def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -145,10 +154,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote for formatting a string value, it will be something like
+   *
+   * {{{
    * if (objNm == null)
    *   throw new IllegalArgumentException
    * else
-   *  builder.makeString(objNm)
+   *   builder.makeString(objNm)
+   * }}}
    */
   def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -193,8 +205,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote that formats the field of a case class object, it will be something like
+   *
+   * {{{
    * val caseField = obj.caseField
    * "caseField" -> JsonRegistry.internalFormat(caseField, "", false, caseField's type)
+   * }}}
    */
   def eachAccessorQuote(c: Context)(accessorTpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorField: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -206,10 +221,13 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote that formats a case class object, it will be something like
+   *
+   * {{{
    * if (obj == null)
    *   throw new IllegalArgumentException("The data object has a null attribute")
    * else
    *   builder.makeObject(caseField1Quote, caseField2Quote, ...)
+   * }}}
    */
   def structuredTypeQuote(c: Context)(tpe: c.universe.Type)(objNm: String)(fieldNm: c.universe.TermName)(accessorQuotes: List[c.universe.Tree]): c.universe.Tree = {
     import c.universe._
@@ -269,8 +287,11 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to create a method definition of handle_TRAITTYPE_traitFamily and a call to it, it will be something like
+   *
+   * {{{
    * def handle_TRAITTYPE_traitFamily(objNm: TRAITTYPE) = ???
    * handle_TRAITTYPE_traitFamily(objNm)
+   * }}}
    */
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
@@ -283,7 +304,10 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
 
   /**
    * Quote to format an enum object, it should be something like
+   *
+   * {{{
    * builder.makeString(objNm.toString)
+   * }}}
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._

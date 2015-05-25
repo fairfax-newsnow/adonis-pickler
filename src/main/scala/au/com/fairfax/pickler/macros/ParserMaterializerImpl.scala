@@ -13,8 +13,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote to parse a map, it will be something like
+   *
+   * {{{
    * def parseMap(map: J) = ???
    * parseMap(reader.readObjectField(objNm, s"$fieldNm"))
+   * }}}
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -39,8 +42,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote to parse a collection, it will be something like
+   *
+   * {{{
    * def parseCollection(array: J) = ???
    * parseCollection(reader.readObjectField(objNm, s"$fieldNm"))
+   * }}}
    */
   def collectionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type)(collType: c.universe.TypeName): c.universe.Tree = {
     import c.universe._
@@ -81,23 +87,25 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    * if so, it will be set to None, 
    * o.w. it will proceed to parsing the data,
    * it will be something like
-   *  
+   *
+   * {{{
    * def parseOption(json: J): Option[ITEM] = {
-   *  def handleItem(item: J) = {
-   *    ... recursive parsing on item
-   *  }  
-   *       
-   *  if (reader.isNull(json))
-   *    None
-   *  else
-   *    Some(handleItem(json))
+   *   def handleItem(item: J) = {
+   *     ... recursive parsing on item
+   *   }
+   *
+   *   if (reader.isNull(json))
+   *     None
+   *   else
+   *     Some(handleItem(json))
    * } // parseOption()
-   * 
+   *
    * val obj_field = reader.readObjectField(obj, s"$field")
    * if (reader.isUndefined(obj_field)
-   *  None
-   * else  
-   *  parseOption(obj_field)
+   *   None
+   * else
+   *   parseOption(obj_field)
+   * }}}
    */
   def optionQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(itemTpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -120,8 +128,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote to parse an either, it will be something like
+   *
+   * {{{
    * def parseEither(json: J): Either[LEFT, RIGHT] = ???
    * parseEither(reader.readObjectField(objNm, s"$fieldNm"))
+   * }}}
    */
   def eitherQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(tpe: c.universe.Type): c.universe.Tree = {
     import c.universe._
@@ -147,10 +158,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote to parse a numeric value, it will be something like
+   *
+   * {{{
    * reader.readNumber(
    *   reader.readObjectField(objNm, s"$fieldNm")
    * )
-   *
+   * }}}
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for numeric value
    */
   def numericValQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
@@ -163,13 +176,16 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote to parse a string value, it will be something like, e.g.
+   * Quote to parse a string value, it will be something like,
+   * e.g.
+   * {{{
    * val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
    * if (reader.isNull(objNm_fieldNm)) {
    *   throw new IllegalArgumentException
    * } else {
-   *  reader.readString(objNm_fieldNm)
+   *   reader.readString(objNm_fieldNm)
    * }
+   * }}}
    */
   def stringQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -185,10 +201,12 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote to parse a boolean value, it will be something like, e.g.
+   * Quote to parse a boolean value, it will be something like,
+   * e.g.
+   * {{{
    * val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
    * reader.readBoolean(objNm_fieldNm)
-   *
+   * }}}
    * N.B. unlike stringQuote, it doesn't do null check because an expression of type Null is ineligible for implicit conversion for boolean
    */
   def booleanQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
@@ -209,7 +227,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   /**
    * Quote that reads the field on that object.
    * if the field name is "", objNm is the field, therefore return objNm
-   * o.w. return reader.readObjectField(objNm, s"$fieldNm")
+   * o.w. {{{return reader.readObjectField(objNm, s"$fieldNm")}}}
    */
   def fieldQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -274,18 +292,23 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote that defines the case pattern on a list of the sealed trait family, if all the members are case "objects", it will be
+   *
+   * {{{
    * reader.readString(objNm) match {
    *   case "CaseObject1" => handle_CaseObject1
    *   case "CaseObject2" => handle_CaseObject2
-   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")    
+   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")
    *   ...
    * }
+   * }}}
    * o.w.
+   * {{{
    * reader.readString(reader.readObjectField(objNm, "t")) match {
-   *  case "CaseObject1" => handle_CaseObject1
-   *  case "CaseClass2" => handle_CaseClass2(reader.readObjectField(objNm, "v"))
-   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")    
+   *   case "CaseObject1" => handle_CaseObject1
+   *   case "CaseClass2" => handle_CaseClass2(reader.readObjectField(objNm, "v"))
+   *   case x: String => throw new IllegalArgumentException(s"Invalid value $x, there is no such child class of the sealed trait, check code of this parser and its formatter")
    * }
+   * }}}
    */
   def ptnMatchQuoteForTraitFamily(c: Context)(patternToHandlerQuotes: Set[c.universe.Tree])(objNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._
@@ -300,8 +323,11 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
 
   /**
    * Quote to create a method definition of handle_TRAITTYPE_traitFamily and a call to it, it will be something like
+   *
+   * {{{
    * def handle_TRAITTYPE_traitFamily(objNm: J) = ???
    * handle_TRAITTYPE_traitFamily(reader.readObjectField(objNm, s"$fieldNm"))
+   * }}}
    */
   def traitFamilyMethDefAndCallQuote(c: Context)(traitTpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(quote: c.universe.Tree): c.universe.Tree = {
     import c.universe._
@@ -313,7 +339,9 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
   }
 
   /**
-   * Quote to parse an enum object, it should be something like, e.g.
+   * Quote to parse an enum object, it should be something like,
+   * e.g.
+   * {{{
    * val caseEnumName = {
    *   val objNm_fieldNm = reader.readObjectField(objNm, s"$fieldNm")
    *   if (reader.isNull(objNm_fieldNm)) {
@@ -323,6 +351,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
    *   }
    * }
    * au.com.fairfax.pickler.types.CaseEnum.makeEnum(values.this.StoryStatus.Value, caseEnumName)
+   * }}}
    */
   def enumObjQuote(c: Context)(tpe: c.universe.Type)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName): c.universe.Tree = {
     import c.universe._

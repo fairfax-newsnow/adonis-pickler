@@ -1,0 +1,13 @@
+language: scala
+cache:
+  directories:
+    - "$HOME/.ivy2/cache"
+    - "$HOME/.sbt/boot"
+scala:
+  - 2.11.6
+jdk:
+  - oraclejdk8
+script:
+  - sbt clean test package
+  - find $HOME/.sbt -name "*.lock" | xargs rm
+  - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
