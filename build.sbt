@@ -2,11 +2,11 @@ organization := "au.com.fairfax"
 
 name := "adonis-pickler"
 
-version := "0.1-SNAPSHOT"
+version := "0.0.1-SNAPSHOT"
 
 val scalaV = "2.11.6"
 
-val playV = "2.3.0"
+val playV = "2.3.9"
 
 val scalaTestV = "2.1.7"
 
