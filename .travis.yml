@@ -8,6 +8,7 @@ scala:
 jdk:
   - oraclejdk8
 script:
-  - sbt clean test package
+  - sbt clean coverage test package
   - find $HOME/.sbt -name "*.lock" | xargs rm
   - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm
+after_success: "sbt coveralls"
