@@ -2,7 +2,7 @@ organization := "au.com.fairfax"
 
 name := "adonis-pickler"
 
-version := "0.0.1-SNAPSHOT"
+version := "0.0.1"
 
 val scalaV = "2.11.6"
 
