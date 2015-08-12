@@ -24,8 +24,6 @@ libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % scalaTestV % "test"
 )
 
-sbtPlugin := true
-
 publishMavenStyle := true
 
 pomIncludeRepository := { _ => false }
