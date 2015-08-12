@@ -1,6 +1,7 @@
 #Adonis pickler
 
 [![Build Status](https://travis-ci.org/fairfax-newsnow/adonis-pickler.svg)](https://travis-ci.org/fairfax-newsnow/adonis-pickler)
+[![Build Status](https://semaphoreci.com/api/v1/projects/bb7a749c-7940-4c64-b0b1-8938d3e6560b/455258/badge.svg)](https://semaphoreci.com/newsnow/adonis-pickler)
 [![Coverage Status](https://coveralls.io/repos/fairfax-newsnow/adonis-pickler/badge.svg)](https://coveralls.io/r/fairfax-newsnow/adonis-pickler)
 
 Adonis pickler is a library that serialises Scala objects to Json format and vice versa (aka de-serialisation).  It is designed to cope with the following data types:
