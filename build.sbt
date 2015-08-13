@@ -4,7 +4,7 @@ organization := "au.com.fairfax"
 
 name := "adonis-pickler"
 
-val projectVersion = "0.0.1"
+val projectVersion = "0.0.2"
 
 version := projectVersion
 
@@ -20,7 +20,7 @@ scalaVersion := scalaV
 
 libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scalaV,
-    "com.typesafe.play" %% "play-json" % playV % "test",
+    "com.typesafe.play" %% "play-json" % playV,
     "org.scalatest" %% "scalatest" % scalaTestV % "test"
 )
 
