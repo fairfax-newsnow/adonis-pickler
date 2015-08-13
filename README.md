@@ -29,8 +29,11 @@ resolvers += "Fairfax NewsNow OpenSource Repo" at "http://dl.bintray.com/fairfax
 ```
 
 ```scala
-libraryDependencies += "au.com.fairfax" %% "adonis-pickler" % "0.0.1"
+libraryDependencies += "au.com.fairfax" %% "adonis-pickler" % "0.0.2"
+
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.3.9" // <- This will be removed.
 ```
+**`play-json` will be removed (#3).**
 
 
 ##Json format
