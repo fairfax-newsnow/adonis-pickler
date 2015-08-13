@@ -1,8 +1,9 @@
 #Adonis pickler
 
-[![Build Status](https://travis-ci.org/fairfax-newsnow/adonis-pickler.svg)](https://travis-ci.org/fairfax-newsnow/adonis-pickler)
 [![Build Status](https://semaphoreci.com/api/v1/projects/bb7a749c-7940-4c64-b0b1-8938d3e6560b/455258/badge.svg)](https://semaphoreci.com/newsnow/adonis-pickler)
 [![Coverage Status](https://coveralls.io/repos/fairfax-newsnow/adonis-pickler/badge.svg)](https://coveralls.io/r/fairfax-newsnow/adonis-pickler)
+
+[ ![Download](https://api.bintray.com/packages/fairfax-newsnow/maven/adonis-pickler/images/download.svg) ](https://bintray.com/fairfax-newsnow/maven/adonis-pickler/_latestVersion)
 
 Adonis pickler is a library that serialises Scala objects to Json format and vice versa (aka de-serialisation).  It is designed to cope with the following data types:
 * primitive types, i.e. float, short, double, boolean, int, string
@@ -19,6 +20,18 @@ Adonis pickler is a library that serialises Scala objects to Json format and vic
 * Limited support for an attribute of Any type inside a case class
 
 This pickler can also be compiled to a js library using ScalaJs such that it can be used by js applications executed in browsers. Implicit materializer macro is used in writing this pickler.  You are assumed to have basic understanding of Scala macros and the implicit materializer macro.  Please refer to http://docs.scala-lang.org/overviews/macros/implicits.html for more information.
+
+## Getting Adonis Pickler
+Add the following two lines to the `build.sbt`. Adonis Pickler supports only 2.11.x (at least for now).
+
+```scala
+resolvers += "Fairfax NewsNow OpenSource Repo" at "http://dl.bintray.com/fairfax-newsnow/maven"
+```
+
+```scala
+libraryDependencies += "au.com.fairfax" %% "adonis-pickler" % "0.0.1"
+```
+
 
 ##Json format
 Adonis pickler is designed to provide just enough information in the Json data to minimize the overhead and meanwhile enable it to be de-serialized to Scala object.

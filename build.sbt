@@ -20,7 +20,7 @@ scalaVersion := scalaV
 
 libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scalaV,
-    "com.typesafe.play" %% "play-json" % playV % "test",
+    "com.typesafe.play" %% "play-json" % playV,
     "org.scalatest" %% "scalatest" % scalaTestV % "test"
 )
 
