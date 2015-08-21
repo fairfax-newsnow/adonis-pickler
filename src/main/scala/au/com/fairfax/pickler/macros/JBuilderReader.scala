@@ -11,6 +11,7 @@ trait JBuilder[J] {
 
 trait JReader[J] {
   def isUndefined(x: J): Boolean
+  def isArray(x: J): Boolean
   def isNull(x: J): Boolean
   def readBoolean(x: J): Boolean
   def readNumber(x: J): Double
@@ -18,4 +19,5 @@ trait JReader[J] {
   def readArrayLength(x: J): Int
   def readArrayElem(x: J, index: Int): J
   def readObjectField(x: J, field: String): J
+  def readDict(x: J): String Map J
 }

@@ -1,5 +1,6 @@
 package au.com.fairfax.pickler.macros
 
+import au.com.fairfax.pickler.macros.ParserMaterializerImpl._
 import au.com.fairfax.pickler.macros.Materializer._
 import au.com.fairfax.pickler.simpleTypeNm
 
@@ -36,6 +37,31 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
           """
         }
       }
+      parseMap(${fieldQuote(c)(objNm)(fieldNm)})
+    """
+  }
+
+  def stringMapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
+    q"""
+      def parseMap(map: J) = ${
+      quoteWithNullCheck(c)(varOfNullCheck = "map") {
+        q"""
+            if (${jsonIo(c)}.isArray(map)) {
+              val mapSize = ${jsonIo(c)}.readArrayLength(map)
+              (0 until mapSize).toList.map { idx =>
+                val tuple = ${jsonIo(c)}.readArrayElem(map, idx)
+                val key = ${jsonIo(c)}.readArrayElem(tuple, 0)
+                val value = ${jsonIo(c)}.readArrayElem(tuple, 1)
+                JsonRegistry.parse(key, "", Some(${keyTpe.toString})).asInstanceOf[$keyTpe] -> JsonRegistry.parse(value, "", Some(${valTpe.toString})).asInstanceOf[$valTpe]
+              }.toMap
+            } else {
+              ${jsonIo(c)}.readDict(map).mapValues(value => JsonRegistry.parse(value, "", Some(${valTpe.toString})).asInstanceOf[$valTpe])
+            }
+          """
+      }
+    }
       parseMap(${fieldQuote(c)(objNm)(fieldNm)})
     """
   }
@@ -394,7 +420,7 @@ object ParserMaterializerImpl extends Materializer[JsonParser] {
       """
   }
 
-  // this method is not needed because implicit materializer macro happens 
+  // this method is not needed because implicit materializer macro happens
   // on TraversableRegistrar which calls parserQuote() on this object
 //  def materialize[T: c.WeakTypeTag](c: Context): c.Expr[JsonParser[T]] = {
 //    import c.universe._
