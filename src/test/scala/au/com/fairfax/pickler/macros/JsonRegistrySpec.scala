@@ -63,6 +63,10 @@ case class VectorInt(v: Vector[Int])
 
 case class IntMapInt(map: Int Map Int)
 
+case class StringMapInt(map: String Map Int)
+
+case class StringMapString(map: String Map String)
+
 case class ListSealedTrait2(list: List[SealedTrait2])
 
 case class IntMapSealedTrait2(map: Int Map SealedTrait2)
@@ -179,6 +183,13 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     parse(formatted) should be(d)
   }
 
+//  it should "have BigDecimal formatted/parsed successfully " in {
+//    val d = BigDecimal("99.1")
+//    val formatted = format(d)
+//    formatted should be(PlayJson.parse( """{"t":"BigDecimal","args":"99.1"}"""))
+//    parse(formatted) should be(d)
+//  }
+
   it should "have Float formatted/parsed successfully " in {
     val d = 99.1f
     val formatted = format(d)
@@ -257,6 +268,40 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     parse(formatted) should be(map)
 
     map = IntMapInt(null)
+    a[IllegalArgumentException] should be thrownBy {
+      format(map)
+    }
+
+    map = null
+    a[IllegalArgumentException] should be thrownBy {
+      format(map)
+    }
+  }
+
+  it should "have StringMapInt formatted/parsed successfully " in {
+    var map = StringMapInt(Map("A" -> 202))
+    val formatted = format(map)
+    formatted should be(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.StringMapInt","args":{"map":{"A":202.0}}}"""))
+    parse(formatted) should be(map)
+
+    map = StringMapInt(null)
+    a[IllegalArgumentException] should be thrownBy {
+      format(map)
+    }
+
+    map = null
+    a[IllegalArgumentException] should be thrownBy {
+      format(map)
+    }
+  }
+
+  it should "have StringMapString formatted/parsed successfully " in {
+    var map = StringMapString(Map("A" -> "B"))
+    val formatted = format(map)
+    formatted should be(PlayJson.parse( """{"t":"au.com.fairfax.pickler.macros.StringMapString","args":{"map":{"A":"B"}}}"""))
+    parse(formatted) should be(map)
+
+    map = StringMapString(null)
     a[IllegalArgumentException] should be thrownBy {
       format(map)
     }
@@ -634,10 +679,13 @@ class JsonRegistrySpec extends FlatSpec with Matchers {
     register[Double]
     register[Float]
     register[Int]
+    register[BigDecimal]
     register[Boolean]
     register[String]
     register[SampleClass21]
     register[IntMapInt]
+    register[StringMapInt]
+    register[StringMapString]
     register[SealedTrait4]
     register[SealedTrait1]
     register[ListSealedTrait2]

@@ -51,6 +51,27 @@ object FormatterMaterializerImpl extends Materializer[JsonFormatter] {
     """
   }
 
+  def stringMapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree = {
+    import c.universe._
+    val List(keyTpe, valTpe) = mapTpe.dealias.typeArgs
+
+    q"""
+      def formatMap(map: $keyTpe Map $valTpe) = ${
+      quoteWithNullCheck(c)(varOfNullCheck = "map") {
+        q"""
+              val elems =
+                map.map { t =>
+                  val (k, v) = t
+                  k -> JsonRegistry.internalFormat(v, "", false, ${valTpe.toString})
+                }.toList
+              ${jsonIo(c)}.makeObject(elems: _*)
+          """
+      }
+    }
+      formatMap(${fieldQuote(c)(objNm)(fieldNm)})
+    """
+  }
+
   /**
    * Quote to format a collection, it will be something like
    *

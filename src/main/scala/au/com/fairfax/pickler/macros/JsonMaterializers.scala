@@ -29,6 +29,8 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
    */
   def mapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree
 
+  def stringMapQuote(c: Context)(objNm: c.universe.TermName)(fieldNm: c.universe.TermName)(mapTpe: c.universe.Type): c.universe.Tree
+
   /**
    * Quote to handle a collection
    */
@@ -143,6 +145,10 @@ trait Materializer[FP[_] <: FormatterParser[_]] {
         val itemTpe = t.typeArgs.head
         val collTpe = tpeClassNm(c)(t)
         collectionQuote(c)(objNm)(fieldNm)(itemTpe)(collTpe)
+
+      // a map type with String key
+      case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) && t.typeArgs.head.dealias.toString == deliasTpeName[String](c)  =>
+        stringMapQuote(c)(objNm)(fieldNm)(t)
 
       // a map type
       case t: Type if tpeClassNm(c)(typeOf[Map[_, _]]) == tpeClassNm(c)(t) =>

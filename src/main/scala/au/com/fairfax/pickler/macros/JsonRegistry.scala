@@ -32,6 +32,8 @@ class BaseJsonRegistry extends JsonRegistry {
 
   private val parsers = new MHashMap[String, JsonParser[_]]
   private val formatters = new MHashMap[String, JsonFormatter[_]]
+  
+  private var aliases: String Map String = Map.empty
 
   def register[T](implicit traversableReg: TraversableRegistrar[T]): Unit =
     traversableReg.traversableRegister foreach {
@@ -40,6 +42,32 @@ class BaseJsonRegistry extends JsonRegistry {
         parsers += (key -> parser)
         formatters += (key -> formatter)
     }
+  /**
+   *  Register the old names/locations of type when refactoring to ensure backwards compatibility.
+   */
+  def registerTypeAlias[T: ClassTag](alias: String)(implicit keyProvider: TypeKeyProvider[T]): Unit = {
+    val typeKey = {
+      val key = keyProvider.key
+      key match {
+        case "T" => toMapKey(implicitly[ClassTag[T]].runtimeClass.getName)
+        case k if strReplacement.exists(k contains _._1) => toMapKey(k)
+        case _ => key
+      }
+    }
+    aliases = aliases + (alias -> typeKey)
+  }
+  
+//  def registerTypeAlias[T: ClassTag, Alias: ClassTag](implicit keyProvider: TypeKeyProvider[T], aliasProvider: TypeKeyProvider[Alias]): Unit = {
+//    val aliasKey = {
+//      val key = aliasProvider.key
+//      key match {
+//        case "T" => toMapKey(className[T])
+//        case k if strReplacement.exists(k contains _._1) => toMapKey(k)
+//        case _ => key
+//      }
+//    }
+//    registerTypeAlias[T](aliasKey)(keyProvider)
+//  }
 
   def format[J, T: ClassTag](obj: T)(implicit builder: JBuilder[J], keyProvider: TypeKeyProvider[T]): J = {
     val typeKey = keyProvider.key
@@ -69,7 +97,7 @@ class BaseJsonRegistry extends JsonRegistry {
     // if objClassName doesn't work, then this objClassName might be a primitive data type class,
     // i.e. java.lang.Float, java.lang.Short, ...
     lazy val primitiveType = toMapKey(objClassName)
-    
+
     formatters.get(typeKey).fold {
       formatters.get(objClassName).fold {
         formatters.get(primitiveType).fold {
@@ -91,6 +119,12 @@ class BaseJsonRegistry extends JsonRegistry {
       } (_.parse(jsonForConcreteType)("v"))
     } { _.parse(json)(nameOfParsedField) }
   }
+  
+  private def formatter(key: String): Option[JsonFormatter[_]] = 
+    formatters.get(key).fold(aliases.get(key).flatMap(formatters.get))(Some(_))
+
+  private def parser(key: String): Option[JsonParser[_]] = 
+    parsers.get(key).fold(aliases.get(key).flatMap(parsers.get))(Some(_))
 
 }
 

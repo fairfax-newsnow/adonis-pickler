@@ -36,7 +36,7 @@ package object macros {
         !tpe.typeSymbol.isModuleClass
 
   private val name2SimpleTypeName: String => (String, String) = s => s -> simpleTypeNm(s)
-  /*
+  /**
    * A primitive type, such as classOf[Float].getName != typeOf[Float].getName.  But the type of a 
    * data type, i.e. "Float" is used as the key to its corresponding formatter/parser in the JsonRegistry, 
    * therefore strConversion is defined to convert a primitive type class name to the corresponding type name 
@@ -59,10 +59,10 @@ package object macros {
     ).toMap
   
   lazy val strReplacement: String Map String =
-    Map(
-      name2SimpleTypeName(className[Map[_, _]])
-    )
-      
+    List(className[Map[_,_]]).map {
+      s => s -> simpleTypeNm(s)
+    } .toMap
+
   def className[T: ClassTag] = implicitly[ClassTag[T]].runtimeClass.getName
 
   def toMapKey(s: String): String =

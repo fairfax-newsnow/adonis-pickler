@@ -35,4 +35,10 @@ object PlayJsonJReader extends JReader[JsValue] {
 
   def readObjectField(x: JsValue, field: String): JsValue =
     x.asInstanceOf[JsObject] \ field
+
+  override def isArray(x: JsValue): Boolean =
+    x.isInstanceOf[JsArray]
+
+  override def readDict(x: JsValue): Map[String, JsValue] =
+    x.as[Map[String, JsValue]]
 }
